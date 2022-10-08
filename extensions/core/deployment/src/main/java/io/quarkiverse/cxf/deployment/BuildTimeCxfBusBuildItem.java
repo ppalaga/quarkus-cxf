@@ -7,14 +7,14 @@ import io.quarkus.builder.item.SimpleBuildItem;
 /**
  * Holds the build time {@link Bus} instance.
  */
-public final class CxfBusBuildItem extends SimpleBuildItem {
+public final class BuildTimeCxfBusBuildItem extends SimpleBuildItem {
     private final Bus bus;
 
     public Bus getBus() {
         return bus;
     }
 
-    public CxfBusBuildItem(Bus bus) {
+    public BuildTimeCxfBusBuildItem(Bus bus) {
         super();
         this.bus = bus;
     }

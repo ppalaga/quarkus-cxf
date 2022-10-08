@@ -20,6 +20,7 @@ import java.util.logging.Level;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import javax.inject.Singleton;
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -51,12 +52,16 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
+import io.quarkiverse.cxf.CXFRecorder;
 import io.quarkiverse.cxf.deployment.CxfWrapperClassNamesBuildItem.Builder;
 import io.quarkus.arc.deployment.GeneratedBeanBuildItem;
 import io.quarkus.arc.deployment.GeneratedBeanGizmoAdaptor;
+import io.quarkus.arc.deployment.SyntheticBeanBuildItem;
 import io.quarkus.arc.deployment.UnremovableBeanBuildItem;
 import io.quarkus.deployment.annotations.BuildProducer;
 import io.quarkus.deployment.annotations.BuildStep;
+import io.quarkus.deployment.annotations.ExecutionTime;
+import io.quarkus.deployment.annotations.Record;
 import io.quarkus.deployment.builditem.CombinedIndexBuildItem;
 import io.quarkus.deployment.builditem.ExtensionSslNativeSupportBuildItem;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
@@ -73,6 +78,7 @@ import io.quarkus.deployment.pkg.PackageConfig;
 import io.quarkus.deployment.pkg.builditem.UberJarMergedResourceBuildItem;
 import io.quarkus.deployment.pkg.builditem.UberJarRequiredBuildItem;
 import io.quarkus.gizmo.ClassOutput;
+import io.quarkus.runtime.RuntimeValue;
 
 class QuarkusCxfProcessor {
 
@@ -110,15 +116,37 @@ class QuarkusCxfProcessor {
     }
 
     @BuildStep
-    CxfBusBuildItem bus() {
+    BuildTimeCxfBusBuildItem createBuildTimeBus() {
         final Bus bus = BusFactory.getDefaultBus();
-        // setup class capturing
-        return new CxfBusBuildItem(bus);
+        return new BuildTimeCxfBusBuildItem(bus);
+    }
+
+    /**
+     * Publish the configured {@link Bus} so that the consumers have some reliable point in time after which they can
+     * use it.
+     *
+     * @param recorder
+     * @param bus
+     */
+    @BuildStep
+    @Record(ExecutionTime.STATIC_INIT)
+    void createRuntimeBus(
+            CXFRecorder recorder,
+            BuildProducer<RuntimeCxfBusBuildItem> bus,
+            BuildProducer<SyntheticBeanBuildItem> syntheticBeans) {
+        RuntimeValue<Bus> runtimeBus = recorder.createBus();
+        bus.produce(new RuntimeCxfBusBuildItem(runtimeBus));
+        syntheticBeans.produce(
+                SyntheticBeanBuildItem
+                        .configure(Bus.class)
+                        .setRuntimeInit().scope(Singleton.class)
+                        .runtimeValue(runtimeBus)
+                        .done());
     }
 
     @BuildStep
     CxfWrapperClassNamesBuildItem cxfWrapperClassNames(
-            CxfBusBuildItem bus,
+            BuildTimeCxfBusBuildItem bus,
             List<CxfClientBuildItem> clients,
             List<CxfEndpointImplementationBuildItem> endpointImplementations,
             BuildProducer<GeneratedBeanBuildItem> generatedBeans) {

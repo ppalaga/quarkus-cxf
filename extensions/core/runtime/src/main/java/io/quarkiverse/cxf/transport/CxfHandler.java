@@ -21,10 +21,8 @@ import org.apache.cxf.interceptor.Interceptor;
 import org.apache.cxf.jaxws.JAXWSMethodInvoker;
 import org.apache.cxf.jaxws.JaxWsServerFactoryBean;
 import org.apache.cxf.message.Message;
-import org.apache.cxf.transport.ConduitInitiatorManager;
-import org.apache.cxf.transport.DestinationFactoryManager;
+import org.apache.cxf.transport.DestinationFactory;
 import org.apache.cxf.transport.http.DestinationRegistry;
-import org.apache.cxf.transport.http.DestinationRegistryImpl;
 import org.apache.cxf.transport.servlet.ServletController;
 import org.apache.cxf.transport.servlet.servicelist.ServiceListGeneratorServlet;
 import org.jboss.logging.Logger;
@@ -45,24 +43,26 @@ import io.vertx.ext.web.RoutingContext;
 
 public class CxfHandler implements Handler<RoutingContext> {
     private static final Logger LOGGER = Logger.getLogger(CxfHandler.class);
-    private Bus bus;
-    private ClassLoader loader;
-    private DestinationRegistry destinationRegistry;
-    private String contextPath;
-    private String servletPath;
-    private ServletController controller;
-    private BeanContainer beanContainer;
-    private CurrentIdentityAssociation association;
-    private IdentityProviderManager identityProviderManager;
-    private CurrentVertxRequest currentVertxRequest;
-    private HttpConfiguration httpConfiguration;
+    private final Bus bus;
+    private final ClassLoader loader;
+    private final String contextPath;
+    private final String servletPath;
+    private final ServletController controller;
+    private final BeanContainer beanContainer;
+    private final CurrentIdentityAssociation association;
+    private final IdentityProviderManager identityProviderManager;
+    private final CurrentVertxRequest currentVertxRequest;
+    private final HttpConfiguration httpConfiguration;
 
     private static final String X_FORWARDED_PROTO_HEADER = "X-Forwarded-Proto";
     private static final String X_FORWARDED_FOR_HEADER = "X-Forwarded-For";
     private static final String X_FORWARDED_PORT_HEADER = "X-Forwarded-Port";
 
-    public CxfHandler(CXFServletInfos cxfServletInfos, BeanContainer beanContainer, HttpConfiguration httpConfiguration) {
+    public CxfHandler(Bus bus, CXFServletInfos cxfServletInfos, BeanContainer beanContainer,
+            HttpConfiguration httpConfiguration) {
         LOGGER.trace("CxfHandler created");
+        this.bus = bus;
+        this.loader = this.bus.getExtension(ClassLoader.class);
         this.beanContainer = beanContainer;
         this.httpConfiguration = httpConfiguration;
         Instance<CurrentIdentityAssociation> identityAssociationInstance = CDI.current()
@@ -72,22 +72,8 @@ public class CxfHandler implements Handler<RoutingContext> {
         this.identityProviderManager = identityProviderManagerInstance.isResolvable() ? identityProviderManagerInstance.get()
                 : null;
         this.currentVertxRequest = CDI.current().select(CurrentVertxRequest.class).get();
-        if (cxfServletInfos == null || cxfServletInfos.getInfos() == null || cxfServletInfos.getInfos().isEmpty()) {
-            LOGGER.warn("no info transmitted to servlet");
-            return;
-        }
-        this.bus = BusFactory.getDefaultBus();
 
-        this.loader = this.bus.getExtension(ClassLoader.class);
-
-        LOGGER.trace("load destination");
-        DestinationFactoryManager dfm = this.bus.getExtension(DestinationFactoryManager.class);
-        destinationRegistry = new DestinationRegistryImpl();
-        VertxDestinationFactory destinationFactory = new VertxDestinationFactory(destinationRegistry);
-        dfm.registerDestinationFactory("http://cxf.apache.org/transports/quarkus", destinationFactory);
-        ConduitInitiatorManager extension = bus.getExtension(ConduitInitiatorManager.class);
-        extension.registerConduitInitiator("http://cxf.apache.org/transports/quarkus", destinationFactory);
-
+        final DestinationRegistry destinationRegistry = bus.getExtension(DestinationRegistry.class);
         ServiceListGeneratorServlet serviceListGeneratorServlet = new ServiceListGeneratorServlet(destinationRegistry, bus);
         VertxServletConfig servletConfig = new VertxServletConfig();
         serviceListGeneratorServlet.init(servletConfig);
@@ -95,6 +81,12 @@ public class CxfHandler implements Handler<RoutingContext> {
         servletPath = cxfServletInfos.getPath();
         contextPath = cxfServletInfos.getContextPath();
 
+        if (cxfServletInfos.getInfos().isEmpty()) {
+            // nothing more to do
+            return;
+        }
+
+        final DestinationFactory destinationFactory = bus.getExtension(VertxDestinationFactory.class);
         //suboptimal because done it in loop but not a real issue...
         for (CXFServletInfo servletInfo : cxfServletInfos.getInfos()) {
             QuarkusJaxWsServiceFactoryBean jaxWsServiceFactoryBean = new QuarkusJaxWsServiceFactoryBean(

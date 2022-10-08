@@ -120,6 +120,7 @@ public class CxfEndpointImplementationProcessor {
     @BuildStep
     @Record(ExecutionTime.RUNTIME_INIT)
     void startRoute(CXFRecorder recorder,
+            RuntimeCxfBusBuildItem bus,
             BuildProducer<DefaultRouteBuildItem> defaultRoutes,
             BuildProducer<RouteBuildItem> routes,
             BeanContainerBuildItem beanContainer,
@@ -143,7 +144,7 @@ public class CxfEndpointImplementationProcessor {
                 }
             }
             if (startRoute) {
-                Handler<RoutingContext> handler = recorder.initServer(infos, beanContainer.getValue(),
+                Handler<RoutingContext> handler = recorder.initServer(bus.getBus(), infos, beanContainer.getValue(),
                         httpConfiguration);
                 if (cxfBuildTimeConfig.path != null) {
                     routes.produce(RouteBuildItem.builder()

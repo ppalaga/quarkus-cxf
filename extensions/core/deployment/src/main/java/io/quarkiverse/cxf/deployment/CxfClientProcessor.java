@@ -62,7 +62,7 @@ public class CxfClientProcessor {
     @BuildStep
     void collectClients(
             CombinedIndexBuildItem combinedIndexBuildItem,
-            CxfBusBuildItem bus,
+            BuildTimeCxfBusBuildItem bus,
             BuildProducer<ReflectiveClassBuildItem> reflectiveClass,
             BuildProducer<ReflectiveBeanClassBuildItem> reflectiveBeanClass,
             BuildProducer<NativeImageProxyDefinitionBuildItem> proxies,

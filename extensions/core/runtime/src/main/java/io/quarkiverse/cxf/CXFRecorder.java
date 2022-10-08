@@ -7,10 +7,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.cxf.Bus;
+import org.apache.cxf.BusFactory;
+import org.apache.cxf.transport.ConduitInitiatorManager;
+import org.apache.cxf.transport.DestinationFactoryManager;
+import org.apache.cxf.transport.http.DestinationRegistry;
+import org.apache.cxf.transport.http.DestinationRegistryImpl;
 import org.jboss.logging.Logger;
 
 import io.quarkiverse.cxf.devconsole.DevCxfServerInfosSupplier;
 import io.quarkiverse.cxf.transport.CxfHandler;
+import io.quarkiverse.cxf.transport.VertxDestinationFactory;
 import io.quarkus.arc.runtime.BeanContainer;
 import io.quarkus.runtime.RuntimeValue;
 import io.quarkus.runtime.annotations.Recorder;
@@ -135,11 +142,29 @@ public class CXFRecorder {
         return new RuntimeValue<>(infos);
     }
 
-    public Handler<RoutingContext> initServer(RuntimeValue<CXFServletInfos> infos, BeanContainer beanContainer,
+    public Handler<RoutingContext> initServer(RuntimeValue<Bus> bus, RuntimeValue<CXFServletInfos> infos,
+            BeanContainer beanContainer,
             HttpConfiguration httpConfiguration) {
         LOGGER.trace("init server");
         // There may be a better way to handle this
         DevCxfServerInfosSupplier.setServletInfos(infos.getValue());
-        return new CxfHandler(infos.getValue(), beanContainer, httpConfiguration);
+        return new CxfHandler(bus.getValue(), infos.getValue(), beanContainer, httpConfiguration);
     }
+
+    public RuntimeValue<Bus> createBus() {
+        final Bus bus = BusFactory.getDefaultBus();
+        System.out.println("== created runtime bus " + System.identityHashCode(bus) + " " + bus.getClass().getName());
+        DestinationFactoryManager dfm = bus.getExtension(DestinationFactoryManager.class);
+        final DestinationRegistryImpl destinationRegistry = new DestinationRegistryImpl();
+        bus.setExtension(destinationRegistry, DestinationRegistry.class);
+        final VertxDestinationFactory destinationFactory = new VertxDestinationFactory(destinationRegistry);
+        bus.setExtension(destinationFactory, VertxDestinationFactory.class);
+        ConduitInitiatorManager conduitInitiatorManager = bus.getExtension(ConduitInitiatorManager.class);
+        for (String id : destinationFactory.getTransportIds()) {
+            dfm.registerDestinationFactory(id, destinationFactory);
+            conduitInitiatorManager.registerConduitInitiator(id, destinationFactory);
+        }
+        return new RuntimeValue<>(bus);
+    }
+
 }

@@ -18,7 +18,7 @@ public class VertxDestinationFactory extends SoapTransportFactory implements Des
 
     protected final DestinationRegistry registry;
 
-    protected VertxDestinationFactory(DestinationRegistry registry) {
+    public VertxDestinationFactory(DestinationRegistry registry) {
         super();
         this.registry = registry;
     }
@@ -41,5 +41,9 @@ public class VertxDestinationFactory extends SoapTransportFactory implements Des
             LOGGER.debug(format("Destination for address %s is %s", endpointAddress, d));
             return d;
         }
+    }
+
+    public DestinationRegistry getDestinationRegistry() {
+        return registry;
     }
 }
