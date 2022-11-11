@@ -1,6 +1,7 @@
 package io.quarkiverse.cxf.deployment;
 
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -8,6 +9,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import javax.enterprise.context.ApplicationScoped;
@@ -23,6 +25,7 @@ import org.jboss.jandex.DotName;
 import org.jboss.jandex.IndexView;
 import org.jboss.jandex.MethodInfo;
 import org.jboss.jandex.MethodParameterInfo;
+import org.jboss.jandex.Type;
 import org.jboss.logging.Logger;
 
 import io.quarkiverse.cxf.CXFClientData;
@@ -41,6 +44,8 @@ import io.quarkus.deployment.annotations.ExecutionTime;
 import io.quarkus.deployment.annotations.Record;
 import io.quarkus.deployment.builditem.CombinedIndexBuildItem;
 import io.quarkus.deployment.builditem.nativeimage.NativeImageProxyDefinitionBuildItem;
+import io.quarkus.deployment.builditem.nativeimage.RuntimeInitializedClassBuildItem;
+import io.quarkus.deployment.builditem.nativeimage.RuntimeInitializedPackageBuildItem;
 import io.quarkus.gizmo.ClassCreator;
 import io.quarkus.gizmo.ClassOutput;
 import io.quarkus.gizmo.FieldCreator;
@@ -58,10 +63,13 @@ public class CxfClientProcessor {
     @BuildStep
     void collectClients(
             CombinedIndexBuildItem combinedIndexBuildItem,
+            List<RuntimeInitializedClassBuildItem> runtimeInitializedClasses,
+            BuildProducer<RuntimeInitializedPackageBuildItem> runtimeInitializedPackages,
             BuildProducer<NativeImageProxyDefinitionBuildItem> proxies,
             BuildProducer<CxfClientBuildItem> clients) {
         IndexView index = combinedIndexBuildItem.getIndex();
 
+        final AtomicBoolean hasRuntimeInitializedProxy = new AtomicBoolean(false);
         final Set<String> clientSEIsInUse = findClientSEIsInUse(index);
         CxfDeploymentUtils.webServiceAnnotations(index)
                 .forEach(annotation -> {
@@ -87,13 +95,21 @@ public class CxfClientProcessor {
                                 .map(bindingType -> bindingType.value().asString())
                                 .orElse(SOAPBinding.SOAP11HTTP_BINDING);
 
+                        final ProxyInfo proxyInfo = ProxyInfo.of(wsClassInfo, runtimeInitializedClasses, index);
+                        proxies.produce(new NativeImageProxyDefinitionBuildItem(proxyInfo.interfaces));
+
                         clients.produce(
-                                new CxfClientBuildItem(sei, soapBinding, wsNamespace, wsName));
-                        proxies.produce(new NativeImageProxyDefinitionBuildItem(wsClassInfo.name().toString(),
-                                "javax.xml.ws.BindingProvider", "java.io.Closeable", "org.apache.cxf.endpoint.Client"));
+                                new CxfClientBuildItem(sei, soapBinding, wsNamespace, wsName, proxyInfo.isRuntimeInitialized));
+
+                        hasRuntimeInitializedProxy.set(hasRuntimeInitializedProxy.get() || proxyInfo.isRuntimeInitialized);
 
                     }
                 });
+
+        if (hasRuntimeInitializedProxy.get()) {
+            runtimeInitializedPackages.produce(new RuntimeInitializedPackageBuildItem(
+                    CxfClientProducer.RUNTIME_INITIALIZED_PROXY_MARKER_INTERFACE_PACKAGE));
+        }
 
     }
 
@@ -118,6 +134,7 @@ public class CxfClientProcessor {
                         client.getSei(),
                         client.getWsName(),
                         client.getWsNamespace(),
+                        client.isProxyRuntimeInitialized(),
                         wrapperClassNames.get(client.getSei())))
                 .map(cxf -> {
                     LOGGER.debugf("producing dedicated CXFClientInfo bean named '%s' for SEI %s", cxf.getSei(), cxf.getSei());
@@ -181,6 +198,22 @@ public class CxfClientProcessor {
                 .forEach(sei -> {
                     generateCxfClientProducer(sei, generatedBeans, unremovableBeans);
                 });
+
+        if (clients.stream().anyMatch(CxfClientBuildItem::isProxyRuntimeInitialized)) {
+            generateMarkerInterface(generatedBeans);
+        }
+    }
+
+    private void generateMarkerInterface(BuildProducer<GeneratedBeanBuildItem> generatedBeans) {
+
+        ClassOutput classoutput = new GeneratedBeanGizmoAdaptor(generatedBeans);
+
+        try (ClassCreator classCreator = ClassCreator.builder()
+                .classOutput(classoutput)
+                .className(CxfClientProducer.RUNTIME_INITIALIZED_PROXY_MARKER_INTERFACE_NAME)
+                .setInterface(true)
+                .build()) {
+        }
     }
 
     private void generateCxfClientProducer(
@@ -276,9 +309,9 @@ public class CxfClientProcessor {
                         cxfClientInfoHandle);
                 createService.returnValue(createService.checkCast(cxfClient, sei));
 
-                //                CatchBlockCreator print = overallCatch.addCatch(Throwable.class);
-                //                print.invokeVirtualMethod(MethodDescriptor.ofMethod(Throwable.class, "printStackTrace", void.class),
-                //                        print.getCaughtException());
+                // CatchBlockCreator print = overallCatch.addCatch(Throwable.class);
+                // print.invokeVirtualMethod(MethodDescriptor.ofMethod(Throwable.class, "printStackTrace", void.class),
+                // print.getCaughtException());
 
             }
 
@@ -328,4 +361,74 @@ public class CxfClientProcessor {
                 .forEach(unremovables::produce);
     }
 
+<<<<<<< HEAD
 }
+=======
+    private static class ProxyInfo {
+
+        public static ProxyInfo of(ClassInfo wsClassInfo, List<RuntimeInitializedClassBuildItem> runtimeInitializedClasses,
+                IndexView index) {
+            final List<String> result = new ArrayList<>();
+            result.add(wsClassInfo.name().toString());
+            result.add("javax.xml.ws.BindingProvider");
+            result.add("java.io.Closeable");
+            result.add("org.apache.cxf.endpoint.Client");
+
+            final Set<String> rtInitClasses = runtimeInitializedClasses.stream()
+                    .map(RuntimeInitializedClassBuildItem::getClassName)
+                    .peek(i -> System.out.println("===== rtinit cl " + i))
+                    .collect(Collectors.toSet());
+            rtInitClasses.add("java.awt.Image");
+
+            final boolean refersToRuntimeInitializedClasses = refersToRuntimeInitializedClasses(wsClassInfo, rtInitClasses,
+                    index);
+
+            if (refersToRuntimeInitializedClasses) {
+                result.add(io.quarkiverse.cxf.CxfClientProducer.RUNTIME_INITIALIZED_PROXY_MARKER_INTERFACE_NAME);
+            }
+            return new ProxyInfo(result, refersToRuntimeInitializedClasses);
+        }
+
+        private static boolean refersToRuntimeInitializedClasses(ClassInfo wsClassInfo, final Set<String> rtInitClasses,
+                IndexView index) {
+            if (rtInitClasses.contains(wsClassInfo.name().toString())) {
+                return true;
+            }
+            boolean ownMethods = wsClassInfo.methods().stream()
+                    .anyMatch(m -> rtInitClasses.contains(m.returnType().name().toString())
+                            || m.parameterTypes().stream()
+                                    .map(Type::name)
+                                    .map(DotName::toString)
+                                    .anyMatch(rtInitClasses::contains));
+            if (ownMethods) {
+                return true;
+            }
+
+            /* Do the same recursively for all interfaces */
+            return wsClassInfo.interfaceNames().stream()
+                    .map(intf -> {
+                        final ClassInfo cl = index.getClassByName(intf);
+                        if (cl == null) {
+                            LOGGER.warnf(
+                                    "Could not check whether %s refers to runtime initialized classes because it was not found in Jandex",
+                                    intf);
+                        }
+                        return cl;
+                    })
+                    .filter(cl -> cl != null)
+                    .anyMatch(cl -> refersToRuntimeInitializedClasses(cl, rtInitClasses, index));
+        }
+
+        private ProxyInfo(List<String> interfaces, boolean isRuntimeInitialized) {
+            super();
+            this.interfaces = interfaces;
+            this.isRuntimeInitialized = isRuntimeInitialized;
+        }
+
+        private final List<String> interfaces;
+        private final boolean isRuntimeInitialized;
+
+    }
+
+}
+>>>>>>> cdd3488 (dirty)

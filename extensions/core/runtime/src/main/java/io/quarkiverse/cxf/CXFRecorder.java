@@ -38,6 +38,7 @@ public class CXFRecorder {
                 cxfClientData.getSoapBinding(),
                 cxfClientData.getWsNamespace(),
                 cxfClientData.getWsName(),
+                cxfClientData.isProxyRuntimeInitialized(),
                 cxfClientData.getClassNames()));
     }
 

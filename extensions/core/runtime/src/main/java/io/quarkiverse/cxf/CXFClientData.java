@@ -18,6 +18,7 @@ public class CXFClientData implements Serializable {
     private String sei;
     private String wsName;
     private String wsNamespace;
+    private boolean proxyRuntimeInitialized;
 
     public CXFClientData() {
     }
@@ -27,11 +28,13 @@ public class CXFClientData implements Serializable {
             String sei,
             String wsName,
             String wsNamespace,
+            boolean proxyRuntimeInitialized,
             List<String> classNames) {
         this.soapBinding = soapBinding;
         this.sei = sei;
         this.wsName = wsName;
         this.wsNamespace = wsNamespace;
+        this.proxyRuntimeInitialized = proxyRuntimeInitialized;
         this.classNames = Collections.unmodifiableList(classNames);
     }
 
@@ -55,6 +58,10 @@ public class CXFClientData implements Serializable {
         return wsNamespace;
     }
 
+    public boolean isProxyRuntimeInitialized() {
+        return proxyRuntimeInitialized;
+    }
+
     public void setClassNames(List<String> classNames) {
         this.classNames = Collections.unmodifiableList(classNames);
     }
@@ -73,5 +80,9 @@ public class CXFClientData implements Serializable {
 
     public void setWsNamespace(String wsNamespace) {
         this.wsNamespace = wsNamespace;
+    }
+
+    public void setProxyRuntimeInitialized(boolean proxyRuntimeInitialized) {
+        this.proxyRuntimeInitialized = proxyRuntimeInitialized;
     }
 }

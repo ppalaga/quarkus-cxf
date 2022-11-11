@@ -19,6 +19,7 @@ public class CXFClientInfo {
     private String epName;
     private String username;
     private String password;
+    private boolean proxyRuntimeInitialized;
     private final List<String> inInterceptors = new ArrayList<>();
     private final List<String> outInterceptors = new ArrayList<>();
     private final List<String> outFaultInterceptors = new ArrayList<>();
@@ -36,6 +37,7 @@ public class CXFClientInfo {
             String soapBinding,
             String wsNamespace,
             String wsName,
+            boolean proxyRuntimeInitialized,
             List<String> classNames) {
         this.classNames.addAll(classNames);
         this.endpointAddress = endpointAddress;
@@ -48,10 +50,12 @@ public class CXFClientInfo {
         this.wsName = wsName;
         this.wsNamespace = wsNamespace;
         this.wsdlUrl = null;
+        this.proxyRuntimeInitialized = proxyRuntimeInitialized;
     }
 
     public CXFClientInfo(CXFClientInfo other) {
-        this(other.sei, other.endpointAddress, other.soapBinding, other.wsNamespace, other.wsName, other.classNames);
+        this(other.sei, other.endpointAddress, other.soapBinding, other.wsNamespace, other.wsName,
+                other.proxyRuntimeInitialized, other.classNames);
         this.wsdlUrl = other.wsdlUrl;
         this.epNamespace = other.epNamespace;
         this.epName = other.epName;
@@ -74,6 +78,7 @@ public class CXFClientInfo {
         this.password = config.password.orElse(this.password);
         this.soapBinding = config.soapBinding.orElse(this.soapBinding);
         this.endpointAddress = config.clientEndpointUrl.orElse(this.endpointAddress);
+
         addFeatures(config);
         addHandlers(config);
         addInterceptors(config);
@@ -180,5 +185,9 @@ public class CXFClientInfo {
             this.handlers.addAll(cxfEndPointConfig.handlers.get());
         }
         return this;
+    }
+
+    public boolean isProxyRuntimeInitialized() {
+        return proxyRuntimeInitialized;
     }
 }
