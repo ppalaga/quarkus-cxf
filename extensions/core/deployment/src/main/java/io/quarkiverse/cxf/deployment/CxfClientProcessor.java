@@ -208,10 +208,9 @@ public class CxfClientProcessor {
 
         ClassOutput classoutput = new GeneratedBeanGizmoAdaptor(generatedBeans);
 
-        try (ClassCreator classCreator = ClassCreator.builder()
+        try (ClassCreator classCreator = ClassCreator.interfaceBuilder()
                 .classOutput(classoutput)
                 .className(CxfClientProducer.RUNTIME_INITIALIZED_PROXY_MARKER_INTERFACE_NAME)
-                .setInterface(true)
                 .build()) {
         }
     }
@@ -361,9 +360,6 @@ public class CxfClientProcessor {
                 .forEach(unremovables::produce);
     }
 
-<<<<<<< HEAD
-}
-=======
     private static class ProxyInfo {
 
         public static ProxyInfo of(ClassInfo wsClassInfo, List<RuntimeInitializedClassBuildItem> runtimeInitializedClasses,
@@ -431,4 +427,3 @@ public class CxfClientProcessor {
     }
 
 }
->>>>>>> cdd3488 (dirty)

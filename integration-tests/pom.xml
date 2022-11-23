@@ -21,6 +21,7 @@
         <module>ws-security-client</module>
         <module>ws-security-server</module>
         <module>ws-trust</module>
+        <module>ws-trust-resteasy</module>
         <module>ws-rm</module>
         <module>mtom</module>
         <module>mtom-awt</module>
@@ -33,6 +34,11 @@
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>io.quarkus.gizmo</groupId>
+                <artifactId>gizmo</artifactId>
+                <version>${gizmo.version}</version>
+            </dependency>
             <dependency>
                 <groupId>io.quarkus</groupId>
                 <artifactId>quarkus-bom</artifactId>

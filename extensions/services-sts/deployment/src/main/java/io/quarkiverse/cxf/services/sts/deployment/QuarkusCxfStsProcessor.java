@@ -32,6 +32,19 @@ public class QuarkusCxfStsProcessor {
                     indexDependencies.produce(new IndexDependencyBuildItem(coords[0], coords[1]));
                 });
     }
+    //
+    //    @BuildStep
+    //    void buildTimeConditions(CombinedIndexBuildItem combinedIndexBuildItem,
+    //            BuildProducer<BuildTimeConditionBuildItem> buildTimeConditions) {
+    //
+    //        final IndexView index = combinedIndexBuildItem.getIndex();
+    //
+    //        buildTimeConditions
+    //                .produce(new BuildTimeConditionBuildItem(index.getClassByName(RESTSecurityTokenService.class), false));
+    //        buildTimeConditions
+    //                .produce(new BuildTimeConditionBuildItem(index.getClassByName(RESTSecurityTokenServiceImpl.class), false));
+    //
+    //    }
 
     @BuildStep
     void buildTimeConditions(CombinedIndexBuildItem combinedIndexBuildItem,

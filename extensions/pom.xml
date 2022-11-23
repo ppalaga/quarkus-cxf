@@ -28,6 +28,11 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
+                <groupId>io.quarkus.gizmo</groupId>
+                <artifactId>gizmo</artifactId>
+                <version>${gizmo.version}</version>
+            </dependency>
+            <dependency>
                 <groupId>io.quarkus</groupId>
                 <artifactId>quarkus-bom</artifactId>
                 <version>${quarkus.version}</version>
