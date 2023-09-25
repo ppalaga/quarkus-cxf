@@ -15,19 +15,23 @@ public class SecurityPolicyResource {
 
     @Inject
     @CXFClient("hello")
-    HelloService helloService;
+    HelloService hello;
 
     @Inject
     @CXFClient("helloIp")
-    HelloService helloIpService;
+    HelloService helloIp;
 
     @Inject
-    @CXFClient("helloPolicyHttps")
-    HelloService helloPolicyHttpsService;
+    @CXFClient("helloHttps")
+    HelloService helloHttps;
 
     @Inject
-    @CXFClient("helloPolicyHttp")
-    HelloService helloPolicyHttpService;
+    @CXFClient("helloHttp")
+    HelloService helloHttp;
+
+    @Inject
+    @CXFClient("helloUsernameToken")
+    HelloService helloUsernameToken;
 
     @POST
     @Path("/{client}")
@@ -36,16 +40,19 @@ public class SecurityPolicyResource {
         final HelloService service;
         switch (client) {
             case "hello":
-                service = helloService;
+                service = hello;
                 break;
             case "helloIp":
-                service = helloIpService;
+                service = helloIp;
                 break;
-            case "helloPolicyHttps":
-                service = helloPolicyHttpsService;
+            case "helloHttps":
+                service = helloHttps;
                 break;
-            case "helloPolicyHttp":
-                service = helloPolicyHttpService;
+            case "helloHttp":
+                service = helloHttp;
+                break;
+            case "helloUsernameToken":
+                service = helloUsernameToken;
                 break;
             default:
                 throw new IllegalStateException("Unexpected client " + client);
