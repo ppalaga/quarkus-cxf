@@ -19,6 +19,8 @@ import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.TrustManagerFactory;
 import javax.xml.namespace.QName;
 
+import jakarta.enterprise.inject.Any;
+import jakarta.enterprise.inject.Instance;
 import jakarta.enterprise.inject.spi.InjectionPoint;
 import jakarta.inject.Inject;
 import jakarta.xml.ws.BindingProvider;
@@ -31,6 +33,7 @@ import org.apache.cxf.feature.Feature;
 import org.apache.cxf.frontend.ClientProxy;
 import org.apache.cxf.helpers.CastUtils;
 import org.apache.cxf.interceptor.Interceptor;
+import org.apache.cxf.jaxws.JaxWsProxyFactoryBean;
 import org.apache.cxf.message.Message;
 import org.apache.cxf.transport.http.HTTPConduit;
 import org.apache.cxf.transport.http.HTTPConduitFactory;
@@ -39,6 +42,7 @@ import org.jboss.logging.Logger;
 
 import io.quarkiverse.cxf.CxfClientConfig.HTTPConduitImpl;
 import io.quarkiverse.cxf.CxfClientConfig.WellKnownHostnameVerifier;
+import io.quarkiverse.cxf.CxfClientProducer.JaxWsProxyFactoryBeanCustomizer.Context;
 import io.quarkiverse.cxf.annotation.CXFClient;
 
 /**
@@ -62,6 +66,10 @@ public abstract class CxfClientProducer {
 
     @Inject
     CxfFixedConfig fixedConfig;
+
+    @Inject
+    @Any
+    Instance<JaxWsProxyFactoryBeanCustomizer> customizers;
 
     /**
      * Must be public, otherwise: java.lang.VerifyError: Bad access to protected data in invokevirtual
@@ -170,6 +178,14 @@ public abstract class CxfClientProducer {
                 throw new IllegalStateException("Unexpected " + HTTPConduitImpl.class.getSimpleName() + " value: "
                         + cxfClientInfo.getHttpConduitImpl());
         }
+
+        Context c = new Context() {
+            @Override
+            public <T> T lookUpBean(String beanRef) {
+                return CXFRuntimeUtils.getInstance(beanRef, true);
+            }
+        };
+        customizers.forEach(customizer -> customizer.customize(c, cxfClientInfo, factory));
 
         LOGGER.debug("cxf client loaded for " + cxfClientInfo.getSei());
         Object result = factory.create();
@@ -384,6 +400,14 @@ public abstract class CxfClientProducer {
                                 .collect(Collectors.joining(", ")));
         }
 
+    }
+
+    public interface JaxWsProxyFactoryBeanCustomizer {
+        void customize(Context context, CXFClientInfo cxfClientInfo, JaxWsProxyFactoryBean factory);
+
+        public interface Context {
+            <T> T lookUpBean(String beanRef);
+        }
     }
 
 }
