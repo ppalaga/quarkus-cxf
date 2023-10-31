@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    xmlns:tns="http://www.jboss.org/eap/quickstarts/wscalculator/Calculator"
+    targetNamespace="http://www.jboss.org/eap/quickstarts/wscalculator/Calculator"
+    elementFormDefault="qualified">
+
+  <xs:element name="add" type="tns:addType"></xs:element>
+  <xs:element name="addResponse" type="tns:addResponseType"></xs:element>
+
+  <xs:simpleType name="smallIntType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="-1024" />
+      <xs:maxInclusive value="1024" />
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:complexType name="addType">
+    <xs:sequence>
+      <xs:element name="arg0" type="tns:smallIntType"></xs:element>
+      <xs:element name="arg1" type="tns:smallIntType"></xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="addResponseType">
+    <xs:sequence>
+      <xs:element name="return" type="tns:smallIntType"></xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+
+</xs:schema>

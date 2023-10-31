@@ -1,4 +1,5 @@
-<?xml version="1.0" ?><wsdl:definitions xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" xmlns:tns="http://www.jboss.org/eap/quickstarts/wscalculator/Calculator" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:ns1="http://schemas.xmlsoap.org/soap/http" name="CalculatorService" targetNamespace="http://www.jboss.org/eap/quickstarts/wscalculator/Calculator">
+<?xml version="1.0" ?>
+<wsdl:definitions xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" xmlns:tns="http://www.jboss.org/eap/quickstarts/wscalculator/Calculator" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:ns1="http://schemas.xmlsoap.org/soap/http" name="CalculatorService" targetNamespace="http://www.jboss.org/eap/quickstarts/wscalculator/Calculator">
   <wsdl:types>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:tns="http://www.jboss.org/eap/quickstarts/wscalculator/Calculator" elementFormDefault="unqualified" targetNamespace="http://www.jboss.org/eap/quickstarts/wscalculator/Calculator" version="1.0">
 

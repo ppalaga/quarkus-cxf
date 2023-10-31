@@ -1,5 +1,7 @@
 package io.quarkiverse.cxf.transport;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Stream;
 
@@ -13,6 +15,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.apache.cxf.Bus;
 import org.apache.cxf.BusFactory;
 import org.apache.cxf.common.classloader.ClassLoaderUtils;
+import org.apache.cxf.endpoint.Server;
 import org.apache.cxf.jaxws.JAXWSMethodInvoker;
 import org.apache.cxf.jaxws.JaxWsServerFactoryBean;
 import org.apache.cxf.transport.ConduitInitiatorManager;
@@ -130,8 +133,14 @@ public class CxfHandler implements Handler<RoutingContext> {
                     jaxWsServerFactoryBean.setPublishedEndpointUrl(servletInfo.getEndpointUrl());
                 }
                 customizers.forEach(customizer -> customizer.customize(servletInfo, jaxWsServerFactoryBean));
+                Map<String, Object> props = jaxWsServerFactoryBean.getProperties();
+                if (props == null) {
+                    props = new LinkedHashMap<>();
+                    jaxWsServerFactoryBean.setProperties(props);
+                }
+                props.put("schema-validation-enabled", "true");
 
-                jaxWsServerFactoryBean.create();
+                Server s = jaxWsServerFactoryBean.create();
 
                 LOGGER.info(servletInfo.toString() + " available.");
             } else {
