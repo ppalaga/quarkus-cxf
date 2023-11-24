@@ -67,6 +67,15 @@ jobs:
           MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.OSSRH_TOKEN }}
 
+      - name: Sync the examples in the docs
+        run: |
+          ./mvnw clean install -DskipTests -Dquarkus.build.skip -pl integration-tests/client -am
+          git add -A
+          git commit --amend --no-edit
+        env:
+          MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.OSSRH_TOKEN }}
+
       - name: Push changes to ${{github.base_ref}} branch
         run: |
           git push
