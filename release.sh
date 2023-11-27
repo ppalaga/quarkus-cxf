@@ -18,8 +18,13 @@ set -e
 
 releaseVersion="$1"
 nextVersion="$2"
+quarkusPlatformBranch=""
 
+if [ -z "$3" ] ; then
+    quarkusPlatformBranch="$3"
+fi
 topicBranch=trigger-release-$releaseVersion
+
 git checkout -b $topicBranch
 
 sed -i -e 's|  current-version:.*|  current-version: '$releaseVersion'|' .github/project.yml

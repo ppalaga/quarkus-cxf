@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - uses: radcortez/project-metadata-action@master
-        name: Retrieve project metadata
+        name: Read project.yml
         id: metadata
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}
@@ -49,7 +49,7 @@ jobs:
       - name: Configure Git author
         run: |
           git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
+          git config --local user.name "Quarkus CXF release workflow"
 
       - name: Update latest release version in docs
         run: |
@@ -80,3 +80,52 @@ jobs:
         run: |
           git push
           git push origin ${{steps.metadata.outputs.current-version}}
+
+  upgrade-in-the-platform:
+    strategy:
+      fail-fast: false
+    name: Upgrade Quarkus CXF in the platform
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: radcortez/project-metadata-action@master
+        name: Read project.yml
+        id: metadata
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          metadata-file-path: '.github/project.yml'
+
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 11
+
+      - name: Await release
+        run: |
+          git reset --hard ${{steps.metadata.outputs.current-version}}
+          ./mvnw install -DskipTests -Dquarkus.build.skip
+          ./mvnw org.l2x6.org:cq-maven-plugin:1.2.3:await-release -DreleaseVersion=${{steps.metadata.outputs.current-version}}
+
+      - name: Configure Git author
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "Quarkus CXF release workflow"
+
+      - name: Upgrade Quarkus CXF in Quarkus Platform
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd $HOME
+          git checkout git@github.com:quarkusio/quarkus-platform.git -o upstream
+          cd quarkus-platform
+          git checkout -b quarkus-cxf-${{steps.metadata.outputs.current-version}}
+          sed -i 's|<quarkus-cxf.version>[^<]*</quarkus-cxf.version>|<quarkus-cxf.version>${{steps.metadata.outputs.current-version}}</quarkus-cxf.version>|' pom.xml
+          ./mvnw -Dsync
+          git add -A
+          git commit -m "Upgrade to Quarkus CXF ${{steps.metadata.outputs.current-version}}"
+          git remote add ppalaga git@github.com:ppalaga/quarkus-platform.git
+          git push ppalaga quarkus-cxf-${{steps.metadata.outputs.current-version}}
+          gh pr create -B ${{steps.metadata.outputs.platform-branch}} -H quarkus-cxf-${{steps.metadata.outputs.current-version}} --title 'Upgrade to Quarkus CXF ${{steps.metadata.outputs.current-version}}' --body 'cc @ppalaga'
