@@ -22,6 +22,21 @@ public class MessageRecorder {
             nOut = outRecorder.getOutboundMessages().size();
             nIn = inRecorder.getInboundMessages().size();
             if (nIn >= nExpectedIn && nOut >= nExpectedOut) {
+
+                System.out.println("\nIn Messages actually received:\n");
+                List<byte[]> inbound = inRecorder.getInboundMessages();
+                for (byte[] b : inbound) {
+                    System.out.println(new String(b));
+                    System.out.println("----------------");
+                }
+
+                System.out.println("\nOut Messages actually sent:\n");
+                List<byte[]> outbound = outRecorder.getOutboundMessages();
+                for (byte[] b : outbound) {
+                    System.out.println(new String(b));
+                    System.out.println("----------------");
+                }
+
                 return;
             }
             try {
