@@ -17,11 +17,13 @@
  * under the License.
  */
 
-package io.quarkiverse.cxf.it.ws.rm.server;
+package io.quarkiverse.cxf.it.ws.rm.client;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ListIterator;
+
+import jakarta.enterprise.context.ApplicationScoped;
 
 import org.apache.cxf.interceptor.Fault;
 import org.apache.cxf.interceptor.Interceptor;
@@ -40,6 +42,7 @@ import org.apache.cxf.ws.rm.RMMessageConstants;
 /**
  * Makes every second message get lost.
  */
+@ApplicationScoped
 public class MessageLossSimulator extends AbstractPhaseInterceptor<Message> {
     //private static final Logger LOG = LogUtils.getLogger(MessageLossSimulator.class);
     private int appMessageCount;
