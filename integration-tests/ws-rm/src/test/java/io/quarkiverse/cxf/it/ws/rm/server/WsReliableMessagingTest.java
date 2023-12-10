@@ -7,7 +7,7 @@ import javax.xml.namespace.QName;
 import jakarta.xml.ws.Service;
 
 import org.apache.cxf.Bus;
-import org.apache.cxf.bus.CXFBusFactory;
+import org.apache.cxf.BusFactory;
 import org.apache.cxf.endpoint.Client;
 import org.apache.cxf.frontend.ClientProxy;
 import org.apache.cxf.interceptor.LoggingInInterceptor;
@@ -36,9 +36,7 @@ public class WsReliableMessagingTest {
     @Test
     public void testTwowayMessageLoss() throws Exception {
 
-        CXFBusFactory busFactory = new CXFBusFactory();
-        Bus bus = busFactory.createBus();
-        CXFBusFactory.setDefaultBus(bus);
+        final Bus bus = BusFactory.getDefaultBus();
         QName serviceName = new QName("https://quarkiverse.github.io/quarkiverse-docs/quarkus-cxf/test/ws-rm",
                 "WsrmHelloService");
         Service service = Service.create(new URL(io.quarkiverse.cxf.test.QuarkusCxfClientTestUtil.getServerUrl()
