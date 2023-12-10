@@ -44,28 +44,18 @@ public class WsReliableMessagingTest {
         Service service = Service.create(new URL(io.quarkiverse.cxf.test.QuarkusCxfClientTestUtil.getServerUrl()
                 + "/services/wsrm?wsdl"),
                 serviceName);
-        //final LoggingFeature loggingFeature = new LoggingFeature();
-        //loggingFeature.setPrettyLogging(true);
-        //RMStoreFeature rmFeature = new RMStoreFeature();
         RMFeature rmFeature = new RMFeature();
+        rmFeature.setRMNamespace(RM11Constants.NAMESPACE_URI);
         RMAssertion.BaseRetransmissionInterval baseRetransmissionInterval = new RMAssertion.BaseRetransmissionInterval();
         baseRetransmissionInterval.setMilliseconds(Long.valueOf(4000));
         RMAssertion.AcknowledgementInterval acknowledgementInterval = new RMAssertion.AcknowledgementInterval();
         acknowledgementInterval.setMilliseconds(Long.valueOf(2000));
-        rmFeature.setRMNamespace(RM11Constants.NAMESPACE_URI);
+
         RMAssertion rmAssertion = new RMAssertion();
         rmAssertion.setAcknowledgementInterval(acknowledgementInterval);
         rmAssertion.setBaseRetransmissionInterval(baseRetransmissionInterval);
 
-        /*
-         * AcksPolicyType acksPolicy = new AcksPolicyType();
-         * acksPolicy.setIntraMessageThreshold(0);
-         * DestinationPolicyType destinationPolicy = new DestinationPolicyType();
-         * destinationPolicy.setAcksPolicy(acksPolicy);
-         */
-
         rmFeature.setRMAssertion(rmAssertion);
-        //rmFeature.setDestinationPolicy(destinationPolicy);
 
         WsrmHelloService proxy = service.getPort(
                 WsrmHelloService.class,

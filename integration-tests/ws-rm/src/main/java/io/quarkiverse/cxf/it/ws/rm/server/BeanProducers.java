@@ -1,5 +1,6 @@
 package io.quarkiverse.cxf.it.ws.rm.server;
 
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Named;
 
@@ -11,6 +12,7 @@ public class BeanProducers {
 
     @Produces
     @Named
+    @ApplicationScoped
     RMFeature rmFeature() {
         org.apache.cxf.ws.rm.feature.RMFeature rmFeature = new org.apache.cxf.ws.rm.feature.RMFeature();
         rmFeature.setRMNamespace(RM11Constants.NAMESPACE_URI);

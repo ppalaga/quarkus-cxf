@@ -9,8 +9,11 @@ import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.xml.stream.XMLStreamException;
+
 import org.apache.cxf.staxutils.StaxUtils;
 import org.apache.cxf.ws.rm.RMConstants;
+import org.assertj.core.api.Assertions;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -22,7 +25,7 @@ public class MessageFlowAssertions {
     private final List<Document> outboundMessages = new ArrayList<>();
     private final String direction;
 
-    public MessageFlowAssertions(List<byte[]> out, String addrns, String rmns, String direction) throws Exception {
+    public MessageFlowAssertions(List<byte[]> out, String addrns, String rmns, String direction) throws XMLStreamException {
         addressingNamespace = addrns;
         rmNamespace = rmns;
         this.direction = direction;
@@ -31,24 +34,15 @@ public class MessageFlowAssertions {
         }
     }
 
-    public void verifyActions(String... expectedActions) throws Exception {
+    public void verifyActions(String... expectedActions) {
+        String[] actual = outboundMessages.stream()
+                .map(this::getAction)
+                .toArray(String[]::new);
+        Assertions.assertThat(actual).isEqualTo(expectedActions);
 
-        assertEquals(expectedActions.length, outboundMessages.size());
-
-        for (int i = 0; i < expectedActions.length; i++) {
-            Document doc = outboundMessages.get(i);
-            String action = getAction(doc);
-            if (null == expectedActions[i]) {
-                assertNull(action, direction + " message " + i + " has unexpected action: " + action);
-            } else {
-                assertEquals(expectedActions[i], action,
-                        direction + " message " + i
-                                + " does not contain expected action header");
-            }
-        }
     }
 
-    public void verifyMessageNumbers(String... expectedMessageNumbers) throws Exception {
+    public void verifyMessageNumbers(String... expectedMessageNumbers) {
 
         assertEquals(expectedMessageNumbers.length, outboundMessages.size());
 
@@ -68,7 +62,7 @@ public class MessageFlowAssertions {
 
     }
 
-    public void verifyLastMessage(boolean... expectedLastMessages) throws Exception {
+    public void verifyLastMessage(boolean... expectedLastMessages) {
 
         int actualMessageCount = outboundMessages.size();
         assertEquals(expectedLastMessages.length, actualMessageCount);
@@ -85,7 +79,7 @@ public class MessageFlowAssertions {
         }
     }
 
-    public void verifyAcknowledgements(boolean[] expectedAcks) throws Exception {
+    public void verifyAcknowledgements(boolean[] expectedAcks) {
         assertEquals(expectedAcks.length, outboundMessages.size());
 
         for (int i = 0; i < expectedAcks.length; i++) {
@@ -101,7 +95,7 @@ public class MessageFlowAssertions {
         }
     }
 
-    public void verifyAcknowledgements(int expectedAcks) throws Exception {
+    public void verifyAcknowledgements(int expectedAcks) {
 
         int actualMessageCount = outboundMessages.size();
         int ackCount = 0;
@@ -114,7 +108,7 @@ public class MessageFlowAssertions {
         assertEquals(expectedAcks, ackCount, "unexpected number of acks");
     }
 
-    private String getAction(Document document) throws Exception {
+    private String getAction(Document document) {
         Element e = getHeaderElement(document, addressingNamespace, "Action");
         if (null != e) {
             return getText(e);
@@ -122,11 +116,11 @@ public class MessageFlowAssertions {
         return null;
     }
 
-    protected Element getSequence(Document document) throws Exception {
+    protected Element getSequence(Document document) {
         return getRMHeaderElement(document, RMConstants.SEQUENCE_NAME);
     }
 
-    public String getMessageNumber(Element elem) throws Exception {
+    public String getMessageNumber(Element elem) {
         for (Node nd = elem.getFirstChild(); nd != null; nd = nd.getNextSibling()) {
             if (Node.ELEMENT_NODE == nd.getNodeType() && "MessageNumber".equals(nd.getLocalName())) {
                 return getText(nd);
@@ -135,7 +129,7 @@ public class MessageFlowAssertions {
         return null;
     }
 
-    private boolean getLastMessage(Element element) throws Exception {
+    private boolean getLastMessage(Element element) {
         for (Node nd = element.getFirstChild(); nd != null; nd = nd.getNextSibling()) {
             if (Node.ELEMENT_NODE == nd.getNodeType() && "LastMessage".equals(nd.getLocalName())) {
                 return true;
@@ -144,16 +138,15 @@ public class MessageFlowAssertions {
         return false;
     }
 
-    protected Element getAcknowledgment(Document document) throws Exception {
+    protected Element getAcknowledgment(Document document) {
         return getRMHeaderElement(document, RMConstants.SEQUENCE_ACK_NAME);
     }
 
-    private Element getRMHeaderElement(Document document, String name) throws Exception {
+    private Element getRMHeaderElement(Document document, String name) {
         return getHeaderElement(document, rmNamespace, name);
     }
 
-    private static Element getHeaderElement(Document document, String namespace, String localName)
-            throws Exception {
+    private static Element getHeaderElement(Document document, String namespace, String localName) {
         Element envelopeElement = document.getDocumentElement();
         Element headerElement = null;
         for (Node nd = envelopeElement.getFirstChild(); nd != null; nd = nd.getNextSibling()) {
