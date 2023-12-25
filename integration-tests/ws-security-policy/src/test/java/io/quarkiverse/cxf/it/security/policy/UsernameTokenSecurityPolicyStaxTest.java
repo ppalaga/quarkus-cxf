@@ -6,7 +6,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.hamcrest.Matcher;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import io.quarkus.test.junit.QuarkusTest;
@@ -86,18 +85,16 @@ public class UsernameTokenSecurityPolicyStaxTest extends AbstractUsernameTokenSe
         return containsString("An error was discovered processing the &lt;wsse:Security> header");
     }
 
-    @Disabled("https://github.com/quarkiverse/quarkus-cxf/issues/1095")
     @Override
     @Test
     void helloSaml1() {
         super.helloSaml1();
     }
 
-    @Disabled("https://github.com/quarkiverse/quarkus-cxf/issues/1095")
     @Override
     @Test
     void helloSaml2() {
-        super.helloSaml1();
+        super.helloSaml2();
     }
 
 }
