@@ -82,7 +82,7 @@ public class UsernameTokenSecurityPolicyStaxTest extends AbstractUsernameTokenSe
     @Override
     Matcher<String> missingSamlErrorMessage(final String endpoint) {
         /* The Stax implmentation does not honor security.return.security.error = true */
-        return containsString("An error was discovered processing the &lt;wsse:Security> header");
+        return containsString("<faultstring>XML_STREAM_EXC</faultstring>");
     }
 
     @Override
