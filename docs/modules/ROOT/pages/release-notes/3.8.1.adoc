@@ -1,0 +1,30 @@
+= {quarkus-cxf-project-name} 3.8.1 (LTS) release notes
+
+== Important dependency upgrades:
+
+* Quarkus 3.8.0 -> 3.8.1 - https://quarkus.io/blog/quarkus-3-8-released/[release notes]
+* CXF 4.0.3 -> 4.0.4 - https://cxf.apache.org/download.html[release notes], https://github.com/apache/cxf/compare/cxf-4.0.3...cxf-4.0.4[changelog]
+* WSS4J 3.0.2 -> 3.0.3 - https://github.com/apache/ws-wss4j/compare/wss4j-3.0.2...wss4j-3.0.3[changelog]
+* Santuario XMLSec 3.0.3 -> 3.0.4 https://github.com/apache/santuario-xml-security-java/compare/xmlsec-3.0.3...xmlsec-3.0.4[changelog]
+
+== New and noteworthy in {quarkus-cxf-project-name}
+
+=== Mutual TLS (mTLS)
+
+Mutual TLS (mTLS) is now https://github.com/quarkiverse/quarkus-cxf/tree/main/integration-tests/mtls[tested]
+and and can be configured for clients via `https://docs.quarkiverse.io/quarkus-cxf/dev/reference/extensions/quarkus-cxf.html#quarkus-cxf_quarkus-cxf-client-clients-key-store[quarkus.cxf.client."clients".key*]` family of options.
+
+=== Keystores and truststores now looked up in the file system
+
+The keystores and truststores are now https://github.com/quarkiverse/quarkus-cxf/issues/1280[really looked up in the file system]
+unless they are available in the classpath as documented in
+`https://docs.quarkiverse.io/quarkus-cxf/dev/reference/extensions/quarkus-cxf.html#quarkus-cxf_quarkus-cxf-client-clients-trust-store[quarkus.cxf.client."clients".trust-store]`
+and
+`https://docs.quarkiverse.io/quarkus-cxf/dev/reference/extensions/quarkus-cxf.html#quarkus-cxf_quarkus-cxf-client-clients-key-store[quarkus.cxf.client."clients".key-store]`.
+
+=== Bouncy Castle not required anymore
+
+
+== Full changelog
+
+https://github.com/quarkiverse/quarkus-cxf/compare/3.8.1...3.8.0
