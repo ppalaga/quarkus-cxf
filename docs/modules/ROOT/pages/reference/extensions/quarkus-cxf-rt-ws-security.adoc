@@ -993,7 +993,8 @@ tests] yet.
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_DIGEST_ALGORITHM+++`
+*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_DIGEST_ALGORITHM+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-client-clients-security-custom-encryption-algorithm]]`link:#quarkus-cxf_quarkus-cxf-client-clients-security-custom-encryption-algorithm[quarkus.cxf.client."clients".security.custom.encryption.algorithm]`
 .<| `string`
@@ -1003,7 +1004,8 @@ For more information about algorithms, see WS-SecurityPolicy 1.2 and security al
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_ENCRYPTION_ALGORITHM+++`
+*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_ENCRYPTION_ALGORITHM+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-client-clients-security-custom-symmetric-key-encryption-algorithm]]`link:#quarkus-cxf_quarkus-cxf-client-clients-security-custom-symmetric-key-encryption-algorithm[quarkus.cxf.client."clients".security.custom.symmetric.key.encryption.algorithm]`
 .<| `string`
@@ -1013,7 +1015,8 @@ For more information about algorithms, see WS-SecurityPolicy 1.2 and security al
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_SYMMETRIC_KEY_ENCRYPTION_ALGORITHM+++`
+*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_SYMMETRIC_KEY_ENCRYPTION_ALGORITHM+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-client-clients-security-custom-asymmetric-key-encryption-algorithm]]`link:#quarkus-cxf_quarkus-cxf-client-clients-security-custom-asymmetric-key-encryption-algorithm[quarkus.cxf.client."clients".security.custom.asymmetric.key.encryption.algorithm]`
 .<| `string`
@@ -1023,7 +1026,8 @@ For more information about algorithms, see WS-SecurityPolicy 1.2 and security al
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_ASYMMETRIC_KEY_ENCRYPTION_ALGORITHM+++`
+*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_ASYMMETRIC_KEY_ENCRYPTION_ALGORITHM+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-client-clients-security-custom-encryption-key-derivation]]`link:#quarkus-cxf_quarkus-cxf-client-clients-security-custom-encryption-key-derivation[quarkus.cxf.client."clients".security.custom.encryption.key.derivation]`
 .<| `string`
@@ -1033,7 +1037,8 @@ For more information about algorithms, see WS-SecurityPolicy 1.2 and security al
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_ENCRYPTION_KEY_DERIVATION+++`
+*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_ENCRYPTION_KEY_DERIVATION+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-client-clients-security-custom-signature-key-derivation]]`link:#quarkus-cxf_quarkus-cxf-client-clients-security-custom-signature-key-derivation[quarkus.cxf.client."clients".security.custom.signature.key.derivation]`
 .<| `string`
@@ -1043,7 +1048,8 @@ For more information about algorithms, see WS-SecurityPolicy 1.2 and security al
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_SIGNATURE_KEY_DERIVATION+++`
+*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_SIGNATURE_KEY_DERIVATION+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-client-clients-security-custom-encryption-derived-key-length]]`link:#quarkus-cxf_quarkus-cxf-client-clients-security-custom-encryption-derived-key-length[quarkus.cxf.client."clients".security.custom.encryption.derived.key.length]`
 .<| `int`
@@ -1053,7 +1059,8 @@ For more information about algorithms, see WS-SecurityPolicy 1.2 and security al
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_ENCRYPTION_DERIVED_KEY_LENGTH+++`
+*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_ENCRYPTION_DERIVED_KEY_LENGTH+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-client-clients-security-custom-signature-derived-key-length]]`link:#quarkus-cxf_quarkus-cxf-client-clients-security-custom-signature-derived-key-length[quarkus.cxf.client."clients".security.custom.signature.derived.key.length]`
 .<| `int`
@@ -1063,7 +1070,8 @@ For more information about algorithms, see WS-SecurityPolicy 1.2 and security al
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_SIGNATURE_DERIVED_KEY_LENGTH+++`
+*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_SIGNATURE_DERIVED_KEY_LENGTH+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-client-clients-security-custom-minimum-symmetric-key-length]]`link:#quarkus-cxf_quarkus-cxf-client-clients-security-custom-minimum-symmetric-key-length[quarkus.cxf.client."clients".security.custom.minimum.symmetric.key.length]`
 .<| `int`
@@ -1073,7 +1081,8 @@ For more information about algorithms, see WS-SecurityPolicy 1.2 and security al
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_MINIMUM_SYMMETRIC_KEY_LENGTH+++`
+*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_MINIMUM_SYMMETRIC_KEY_LENGTH+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-client-clients-security-custom-maximum-symmetric-key-length]]`link:#quarkus-cxf_quarkus-cxf-client-clients-security-custom-maximum-symmetric-key-length[quarkus.cxf.client."clients".security.custom.maximum.symmetric.key.length]`
 .<| `int`
@@ -1083,7 +1092,8 @@ For more information about algorithms, see WS-SecurityPolicy 1.2 and security al
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_MAXIMUM_SYMMETRIC_KEY_LENGTH+++`
+*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_MAXIMUM_SYMMETRIC_KEY_LENGTH+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-client-clients-security-custom-minimum-asymmetric-key-length]]`link:#quarkus-cxf_quarkus-cxf-client-clients-security-custom-minimum-asymmetric-key-length[quarkus.cxf.client."clients".security.custom.minimum.asymmetric.key.length]`
 .<| `int`
@@ -1093,7 +1103,8 @@ For more information about algorithms, see WS-SecurityPolicy 1.2 and security al
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_MINIMUM_ASYMMETRIC_KEY_LENGTH+++`
+*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_MINIMUM_ASYMMETRIC_KEY_LENGTH+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-client-clients-security-custom-maximum-asymmetric-key-length]]`link:#quarkus-cxf_quarkus-cxf-client-clients-security-custom-maximum-asymmetric-key-length[quarkus.cxf.client."clients".security.custom.maximum.asymmetric.key.length]`
 .<| `int`
@@ -1103,7 +1114,8 @@ For more information about algorithms, see WS-SecurityPolicy 1.2 and security al
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_MAXIMUM_ASYMMETRIC_KEY_LENGTH+++`
+*Environment variable*: `+++QUARKUS_CXF_CLIENT__CLIENTS__SECURITY_CUSTOM_MAXIMUM_ASYMMETRIC_KEY_LENGTH+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-client-clients-security-sts-client]]`link:#quarkus-cxf_quarkus-cxf-client-clients-security-sts-client[quarkus.cxf.client."clients".security.sts.client]`
 .<| `string`
@@ -2125,7 +2137,8 @@ tests] yet.
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_DIGEST_ALGORITHM+++`
+*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_DIGEST_ALGORITHM+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-endpoint-endpoints-security-custom-encryption-algorithm]]`link:#quarkus-cxf_quarkus-cxf-endpoint-endpoints-security-custom-encryption-algorithm[quarkus.cxf.endpoint."endpoints".security.custom.encryption.algorithm]`
 .<| `string`
@@ -2135,7 +2148,8 @@ For more information about algorithms, see WS-SecurityPolicy 1.2 and security al
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_ENCRYPTION_ALGORITHM+++`
+*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_ENCRYPTION_ALGORITHM+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-endpoint-endpoints-security-custom-symmetric-key-encryption-algorithm]]`link:#quarkus-cxf_quarkus-cxf-endpoint-endpoints-security-custom-symmetric-key-encryption-algorithm[quarkus.cxf.endpoint."endpoints".security.custom.symmetric.key.encryption.algorithm]`
 .<| `string`
@@ -2145,7 +2159,8 @@ For more information about algorithms, see WS-SecurityPolicy 1.2 and security al
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_SYMMETRIC_KEY_ENCRYPTION_ALGORITHM+++`
+*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_SYMMETRIC_KEY_ENCRYPTION_ALGORITHM+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-endpoint-endpoints-security-custom-asymmetric-key-encryption-algorithm]]`link:#quarkus-cxf_quarkus-cxf-endpoint-endpoints-security-custom-asymmetric-key-encryption-algorithm[quarkus.cxf.endpoint."endpoints".security.custom.asymmetric.key.encryption.algorithm]`
 .<| `string`
@@ -2155,7 +2170,8 @@ For more information about algorithms, see WS-SecurityPolicy 1.2 and security al
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_ASYMMETRIC_KEY_ENCRYPTION_ALGORITHM+++`
+*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_ASYMMETRIC_KEY_ENCRYPTION_ALGORITHM+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-endpoint-endpoints-security-custom-encryption-key-derivation]]`link:#quarkus-cxf_quarkus-cxf-endpoint-endpoints-security-custom-encryption-key-derivation[quarkus.cxf.endpoint."endpoints".security.custom.encryption.key.derivation]`
 .<| `string`
@@ -2165,7 +2181,8 @@ For more information about algorithms, see WS-SecurityPolicy 1.2 and security al
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_ENCRYPTION_KEY_DERIVATION+++`
+*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_ENCRYPTION_KEY_DERIVATION+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-endpoint-endpoints-security-custom-signature-key-derivation]]`link:#quarkus-cxf_quarkus-cxf-endpoint-endpoints-security-custom-signature-key-derivation[quarkus.cxf.endpoint."endpoints".security.custom.signature.key.derivation]`
 .<| `string`
@@ -2175,7 +2192,8 @@ For more information about algorithms, see WS-SecurityPolicy 1.2 and security al
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_SIGNATURE_KEY_DERIVATION+++`
+*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_SIGNATURE_KEY_DERIVATION+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-endpoint-endpoints-security-custom-encryption-derived-key-length]]`link:#quarkus-cxf_quarkus-cxf-endpoint-endpoints-security-custom-encryption-derived-key-length[quarkus.cxf.endpoint."endpoints".security.custom.encryption.derived.key.length]`
 .<| `int`
@@ -2185,7 +2203,8 @@ For more information about algorithms, see WS-SecurityPolicy 1.2 and security al
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_ENCRYPTION_DERIVED_KEY_LENGTH+++`
+*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_ENCRYPTION_DERIVED_KEY_LENGTH+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-endpoint-endpoints-security-custom-signature-derived-key-length]]`link:#quarkus-cxf_quarkus-cxf-endpoint-endpoints-security-custom-signature-derived-key-length[quarkus.cxf.endpoint."endpoints".security.custom.signature.derived.key.length]`
 .<| `int`
@@ -2195,7 +2214,8 @@ For more information about algorithms, see WS-SecurityPolicy 1.2 and security al
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_SIGNATURE_DERIVED_KEY_LENGTH+++`
+*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_SIGNATURE_DERIVED_KEY_LENGTH+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-endpoint-endpoints-security-custom-minimum-symmetric-key-length]]`link:#quarkus-cxf_quarkus-cxf-endpoint-endpoints-security-custom-minimum-symmetric-key-length[quarkus.cxf.endpoint."endpoints".security.custom.minimum.symmetric.key.length]`
 .<| `int`
@@ -2205,7 +2225,8 @@ For more information about algorithms, see WS-SecurityPolicy 1.2 and security al
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_MINIMUM_SYMMETRIC_KEY_LENGTH+++`
+*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_MINIMUM_SYMMETRIC_KEY_LENGTH+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-endpoint-endpoints-security-custom-maximum-symmetric-key-length]]`link:#quarkus-cxf_quarkus-cxf-endpoint-endpoints-security-custom-maximum-symmetric-key-length[quarkus.cxf.endpoint."endpoints".security.custom.maximum.symmetric.key.length]`
 .<| `int`
@@ -2215,7 +2236,8 @@ For more information about algorithms, see WS-SecurityPolicy 1.2 and security al
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_MAXIMUM_SYMMETRIC_KEY_LENGTH+++`
+*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_MAXIMUM_SYMMETRIC_KEY_LENGTH+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-endpoint-endpoints-security-custom-minimum-asymmetric-key-length]]`link:#quarkus-cxf_quarkus-cxf-endpoint-endpoints-security-custom-minimum-asymmetric-key-length[quarkus.cxf.endpoint."endpoints".security.custom.minimum.asymmetric.key.length]`
 .<| `int`
@@ -2225,7 +2247,8 @@ For more information about algorithms, see WS-SecurityPolicy 1.2 and security al
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_MINIMUM_ASYMMETRIC_KEY_LENGTH+++`
+*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_MINIMUM_ASYMMETRIC_KEY_LENGTH+++` +
+*Since Quarkus CXF*: 3.8.1
 
 .<| [[quarkus-cxf_quarkus-cxf-endpoint-endpoints-security-custom-maximum-asymmetric-key-length]]`link:#quarkus-cxf_quarkus-cxf-endpoint-endpoints-security-custom-maximum-asymmetric-key-length[quarkus.cxf.endpoint."endpoints".security.custom.maximum.asymmetric.key.length]`
 .<| `int`
@@ -2235,6 +2258,7 @@ For more information about algorithms, see WS-SecurityPolicy 1.2 and security al
 
 For more information about algorithms, see WS-SecurityPolicy 1.2 and security algorithms
 
-*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_MAXIMUM_ASYMMETRIC_KEY_LENGTH+++`
+*Environment variable*: `+++QUARKUS_CXF_ENDPOINT__ENDPOINTS__SECURITY_CUSTOM_MAXIMUM_ASYMMETRIC_KEY_LENGTH+++` +
+*Since Quarkus CXF*: 3.8.1
 |===
 
