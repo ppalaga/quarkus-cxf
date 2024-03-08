@@ -1,5 +1,6 @@
 package io.quarkiverse.cxf.it.security.policy;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,7 @@ public class CustomEncryptSignPolicyTest {
                 .post("/cxf/security-policy/helloCustomizedEncryptSign")
                 .then()
                 .statusCode(200)
-                .body(is("Hello Dolly from CustomizedEncryptSign!"));
+                .body(is("Hello Dolly from CustomEncryptSign!"));
     }
 
     @Test
@@ -40,7 +41,8 @@ public class CustomEncryptSignPolicyTest {
                 .body("Dolly")
                 .post("/cxf/security-policy/helloCustomEncryptSignWrong01")
                 .then()
-                .statusCode(500);
+                .statusCode(500)
+                .body(containsString("An error was discovered processing the <wsse:Security> header"));
     }
 
     @Test
@@ -51,7 +53,9 @@ public class CustomEncryptSignPolicyTest {
                 .body("Dolly")
                 .post("/cxf/security-policy/helloCustomEncryptSignWrong02")
                 .then()
-                .statusCode(500);
+                .statusCode(500)
+                .body(containsString("An error was discovered processing the <wsse:Security> header"));
+
     }
 
 }

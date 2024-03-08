@@ -1053,14 +1053,16 @@ public interface CxfWsSecurityConfig {
         public static final String CUSTOM_ALGORITHM_SUITE_NAME = "CustomAlgorithmSuite";
 
         /**
-         * Digest Algorithm.
+         * The Digest Algorithm to use
          * <p>
          * For more information about algorithms, see
          * <a:href="http://docs.oasis-open.org/ws-sx/ws-securitypolicy/v1.2/errata01/os/ws-securitypolicy-1.2-errata01-os-complete.html#_Toc325572744">WS-SecurityPolicy
          * 1.2</a:href="http://docs.oasis-open.org/ws-sx/ws-securitypolicy/v1.2/errata01/os/ws-securitypolicy-1.2-errata01-os-complete.html#_Toc325572744">
          * and <a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">security
          * algorithms</a></a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">
-         * </p>
+         *
+         * @since 3.8.1
+         * @asciidoclet
          */
         @WssConfigurationConstant(key = SecurityConstants.CUSTOM_ALG_SUITE_DIGEST_ALGORITHM)
         @WithName("custom.digest.algorithm")
@@ -1075,7 +1077,9 @@ public interface CxfWsSecurityConfig {
          * 1.2</a:href="http://docs.oasis-open.org/ws-sx/ws-securitypolicy/v1.2/errata01/os/ws-securitypolicy-1.2-errata01-os-complete.html#_Toc325572744">
          * and <a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">security
          * algorithms</a></a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">
-         * </p>
+         *
+         * @since 3.8.1
+         * @asciidoclet
          */
         @WssConfigurationConstant(key = SecurityConstants.CUSTOM_ALG_SUITE_ENCRYPTION_ALGORITHM)
         @WithName("custom.encryption.algorithm")
@@ -1090,7 +1094,9 @@ public interface CxfWsSecurityConfig {
          * 1.2</a:href="http://docs.oasis-open.org/ws-sx/ws-securitypolicy/v1.2/errata01/os/ws-securitypolicy-1.2-errata01-os-complete.html#_Toc325572744">
          * and <a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">security
          * algorithms</a></a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">
-         * </p>
+         *
+         * @since 3.8.1
+         * @asciidoclet
          */
         @WssConfigurationConstant(key = SecurityConstants.CUSTOM_ALG_SUITE_SYMMETRIC_KEY_ENCRYPTION_ALGORITHM)
         @WithName("custom.symmetric.key.encryption.algorithm")
@@ -1105,7 +1111,9 @@ public interface CxfWsSecurityConfig {
          * 1.2</a:href="http://docs.oasis-open.org/ws-sx/ws-securitypolicy/v1.2/errata01/os/ws-securitypolicy-1.2-errata01-os-complete.html#_Toc325572744">
          * and <a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">security
          * algorithms</a></a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">
-         * </p>
+         *
+         * @since 3.8.1
+         * @asciidoclet
          */
         @WssConfigurationConstant(key = SecurityConstants.CUSTOM_ALG_SUITE_ASYMMETRIC_KEY_ENCRYPTION_ALGORITHM)
         @WithName("custom.asymmetric.key.encryption.algorithm")
@@ -1120,7 +1128,9 @@ public interface CxfWsSecurityConfig {
          * 1.2</a:href="http://docs.oasis-open.org/ws-sx/ws-securitypolicy/v1.2/errata01/os/ws-securitypolicy-1.2-errata01-os-complete.html#_Toc325572744">
          * and <a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">security
          * algorithms</a></a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">
-         * </p>
+         *
+         * @since 3.8.1
+         * @asciidoclet
          */
         @WssConfigurationConstant(key = SecurityConstants.CUSTOM_ALG_SUITE_ENCRYPTION_KEY_DERIVATION)
         @WithName("custom.encryption.key.derivation")
@@ -1135,7 +1145,9 @@ public interface CxfWsSecurityConfig {
          * 1.2</a:href="http://docs.oasis-open.org/ws-sx/ws-securitypolicy/v1.2/errata01/os/ws-securitypolicy-1.2-errata01-os-complete.html#_Toc325572744">
          * and <a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">security
          * algorithms</a></a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">
-         * </p>
+         *
+         * @since 3.8.1
+         * @asciidoclet
          */
         @WssConfigurationConstant(key = SecurityConstants.CUSTOM_ALG_SUITE_SIGNATURE_KEY_DERIVATION)
         @WithName("custom.signature.key.derivation")
@@ -1150,7 +1162,9 @@ public interface CxfWsSecurityConfig {
          * 1.2</a:href="http://docs.oasis-open.org/ws-sx/ws-securitypolicy/v1.2/errata01/os/ws-securitypolicy-1.2-errata01-os-complete.html#_Toc325572744">
          * and <a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">security
          * algorithms</a></a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">
-         * </p>
+         *
+         * @since 3.8.1
+         * @asciidoclet
          */
         @WssConfigurationConstant(key = SecurityConstants.CUSTOM_ALG_SUITE_ENCRYPTION_DERIVED_KEY_LENGTH, transformer = toInteger)
         @WithName("custom.encryption.derived.key.length")
@@ -1165,7 +1179,9 @@ public interface CxfWsSecurityConfig {
          * 1.2</a:href="http://docs.oasis-open.org/ws-sx/ws-securitypolicy/v1.2/errata01/os/ws-securitypolicy-1.2-errata01-os-complete.html#_Toc325572744">
          * and <a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">security
          * algorithms</a></a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">
-         * </p>
+         *
+         * @since 3.8.1
+         * @asciidoclet
          */
         @WssConfigurationConstant(key = SecurityConstants.CUSTOM_ALG_SUITE_SIGNATURE_DERIVED_KEY_LENGTH, transformer = toInteger)
         @WithName("custom.signature.derived.key.length")
@@ -1180,7 +1196,9 @@ public interface CxfWsSecurityConfig {
          * 1.2</a:href="http://docs.oasis-open.org/ws-sx/ws-securitypolicy/v1.2/errata01/os/ws-securitypolicy-1.2-errata01-os-complete.html#_Toc325572744">
          * and <a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">security
          * algorithms</a></a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">
-         * </p>
+         *
+         * @since 3.8.1
+         * @asciidoclet
          */
         @WssConfigurationConstant(key = SecurityConstants.CUSTOM_ALG_SUITE_MINIMUM_SYMMETRIC_KEY_LENGTH, transformer = toInteger)
         @WithName("custom.minimum.symmetric.key.length")
@@ -1195,7 +1213,9 @@ public interface CxfWsSecurityConfig {
          * 1.2</a:href="http://docs.oasis-open.org/ws-sx/ws-securitypolicy/v1.2/errata01/os/ws-securitypolicy-1.2-errata01-os-complete.html#_Toc325572744">
          * and <a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">security
          * algorithms</a></a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">
-         * </p>
+         *
+         * @since 3.8.1
+         * @asciidoclet
          */
         @WssConfigurationConstant(key = SecurityConstants.CUSTOM_ALG_SUITE_MAXIMUM_SYMMETRIC_KEY_LENGTH, transformer = toInteger)
         @WithName("custom.maximum.symmetric.key.length")
@@ -1210,7 +1230,9 @@ public interface CxfWsSecurityConfig {
          * 1.2</a:href="http://docs.oasis-open.org/ws-sx/ws-securitypolicy/v1.2/errata01/os/ws-securitypolicy-1.2-errata01-os-complete.html#_Toc325572744">
          * and <a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">security
          * algorithms</a></a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">
-         * </p>
+         *
+         * @since 3.8.1
+         * @asciidoclet
          */
         @WssConfigurationConstant(key = SecurityConstants.CUSTOM_ALG_SUITE_MINIMUM_ASYMMETRIC_KEY_LENGTH, transformer = toInteger)
         @WithName("custom.minimum.asymmetric.key.length")
@@ -1225,7 +1247,9 @@ public interface CxfWsSecurityConfig {
          * 1.2</a:href="http://docs.oasis-open.org/ws-sx/ws-securitypolicy/v1.2/errata01/os/ws-securitypolicy-1.2-errata01-os-complete.html#_Toc325572744">
          * and <a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">security
          * algorithms</a></a:href="https://www.w3.org/TR/xmlenc-core1/#sec-Algorithms">
-         * </p>
+         *
+         * @since 3.8.1
+         * @asciidoclet
          */
         @WssConfigurationConstant(key = SecurityConstants.CUSTOM_ALG_SUITE_MAXIMUM_ASYMMETRIC_KEY_LENGTH, transformer = toInteger)
         @WithName("custom.maximum.asymmetric.key.length")
