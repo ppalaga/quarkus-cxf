@@ -1,0 +1,1 @@
+io.quarkiverse.cxf.vertx.http.client.VertxWebClientHTTPConduitFactory:org.apache.cxf.transport.http.HTTPConduitFactory:true:true

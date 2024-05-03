@@ -286,4 +286,5 @@ public class CXFRecorder {
     public static boolean isHc5Present() {
         return hc5Present;
     }
+
 }

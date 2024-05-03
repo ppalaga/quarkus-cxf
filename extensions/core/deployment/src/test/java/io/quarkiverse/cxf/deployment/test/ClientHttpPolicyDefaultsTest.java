@@ -15,7 +15,6 @@ import org.apache.cxf.BusFactory;
 import org.apache.cxf.endpoint.Client;
 import org.apache.cxf.frontend.ClientProxy;
 import org.apache.cxf.transport.http.HTTPConduitFactory;
-import org.apache.cxf.transport.http.URLConnectionHTTPConduit;
 import org.apache.cxf.transports.http.configuration.HTTPClientPolicy;
 import org.assertj.core.api.Assertions;
 import org.eclipse.microprofile.config.Config;
@@ -29,6 +28,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import io.quarkiverse.cxf.CxfClientConfig;
 import io.quarkiverse.cxf.URLConnectionHTTPConduitFactory;
 import io.quarkiverse.cxf.annotation.CXFClient;
+import io.quarkiverse.cxf.vertx.http.client.VertxHttpClientHTTPConduit;
 import io.quarkus.test.QuarkusUnitTest;
 
 public class ClientHttpPolicyDefaultsTest {
@@ -87,17 +87,7 @@ public class ClientHttpPolicyDefaultsTest {
         Assertions.assertThat(factory).isInstanceOf(URLConnectionHTTPConduitFactory.class);
 
         final Client client = ClientProxy.getClient(helloService);
-        Assertions.assertThat(client.getConduit()).isInstanceOf(URLConnectionHTTPConduit.class);
-    }
-
-    @Test
-    void httpClientConduitFactory() {
-        final Bus bus = BusFactory.getDefaultBus();
-        final HTTPConduitFactory factory = bus.getExtension(HTTPConduitFactory.class);
-        Assertions.assertThat(factory).isInstanceOf(URLConnectionHTTPConduitFactory.class);
-
-        final Client client = ClientProxy.getClient(helloService);
-        Assertions.assertThat(client.getConduit()).isInstanceOf(URLConnectionHTTPConduit.class);
+        Assertions.assertThat(client.getConduit()).isInstanceOf(VertxHttpClientHTTPConduit.class);
     }
 
     private static String camelCaseToDash(String s) {
@@ -120,7 +110,7 @@ public class ClientHttpPolicyDefaultsTest {
 
     }
 
-    @WebService(endpointInterface = "io.quarkiverse.cxf.deployment.test.ClientHttpPolicyDefaultsTest$HelloService", serviceName = "HelloService")
+    @WebService(serviceName = "HelloService")
     public static class SlowHelloServiceImpl implements HelloService {
 
         @Override
