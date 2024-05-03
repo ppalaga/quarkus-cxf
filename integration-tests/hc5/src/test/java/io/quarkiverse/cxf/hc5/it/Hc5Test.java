@@ -28,8 +28,7 @@ import io.restassured.path.json.JsonPath;
 class Hc5Test {
 
     @ParameterizedTest
-    @ValueSource(strings = { //"sync", "async", "sync-observable",
-            "async-observable" })
+    @ValueSource(strings = { "sync", "async", "sync-observable", "async-observable" })
     void add(String syncMode) {
         RestAssured.given()
                 .header(RequestScopedHeader.header, syncMode + "-header-value")
