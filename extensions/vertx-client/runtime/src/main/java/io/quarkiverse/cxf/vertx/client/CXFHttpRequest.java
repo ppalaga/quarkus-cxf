@@ -20,57 +20,93 @@
 package io.quarkiverse.cxf.vertx.client;
 
 import java.net.URI;
-import java.net.URISyntaxException;
-
-import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
-import org.apache.hc.client5.http.config.Configurable;
-import org.apache.hc.client5.http.config.RequestConfig;
-import org.apache.hc.core5.http.HttpEntity;
 
 import io.quarkiverse.cxf.vertx.client.AsyncHTTPConduit.AsyncWrappedOutputStream;
+import io.vertx.core.http.RequestOptions;
 
-public class CXFHttpRequest extends HttpUriRequestBase implements Configurable {
-    private static final long serialVersionUID = 1L;
+public class CXFHttpRequest {
+//    private AsyncWrappedOutputStream out;
+    //    private RequestConfig config;
 
-    private HttpEntity entity;
-    private AsyncWrappedOutputStream out;
-    private RequestConfig config;
+        private final RequestOptions options;
 
-    public CXFHttpRequest(String method, URI uri) {
-        super(method, uri);
-    }
+        public CXFHttpRequest(RequestOptions options) {
+            super();
+            this.options = options;
+        }
 
-    public void setOutputStream(AsyncWrappedOutputStream o) {
-        out = o;
-    }
 
-    public AsyncWrappedOutputStream getOutputStream() {
-        return out;
-    }
 
-    public HttpEntity getEntity() {
+    //    private static final long serialVersionUID = 1L;
+//
+    private MutableHttpEntity entity;
+//
+//    public void setOutputStream(AsyncWrappedOutputStream o) {
+//        out = o;
+//    }
+//
+//    public AsyncWrappedOutputStream getOutputStream() {
+//        return out;
+//    }
+//
+    public MutableHttpEntity getEntity() {
         return this.entity;
     }
 
-    public void setEntity(final HttpEntity entity) {
+    public void setEntity(final MutableHttpEntity entity) {
         this.entity = entity;
     }
 
-    @Override
-    public RequestConfig getConfig() {
-        return config;
+//    @Override
+//    public RequestConfig getConfig() {
+//        return config;
+//    }
+//
+//    public void setConfig(RequestConfig config) {
+//        this.config = config;
+//    }
+//
+//    @Override
+//    public URI getUri() {
+//        try {
+//            return super.getUri();
+//        } catch (final URISyntaxException ex) {
+//            throw new IllegalArgumentException(ex.getMessage(), ex);
+//        }
+//    }
+
+    public void removeHeaders(String string) {
+        // TODO Auto-generated method stub
+
     }
 
-    public void setConfig(RequestConfig config) {
-        this.config = config;
+    public void setOutputStream(AsyncWrappedOutputStream asyncWrappedOutputStream) {
+        // TODO Auto-generated method stub
+
     }
 
-    @Override
     public URI getUri() {
-        try {
-            return super.getUri();
-        } catch (final URISyntaxException ex) {
-            throw new IllegalArgumentException(ex.getMessage(), ex);
-        }
+        // TODO Auto-generated method stub
+        return null;
     }
+
+    public void addHeader(String cookie, String s) {
+        // TODO Auto-generated method stub
+
+    }
+
+    public void setHeader(String key, String string) {
+        // TODO Auto-generated method stub
+
+    }
+
+    public boolean containsHeader(String string) {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    public RequestOptions getOptions() {
+        return options;
+    }
+
 }

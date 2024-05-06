@@ -19,18 +19,11 @@
 
 package io.quarkiverse.cxf.vertx.client;
 
-import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
 
-import org.apache.hc.core5.function.Supplier;
-import org.apache.hc.core5.http.Header;
-import org.apache.hc.core5.http.HttpEntity;
-
-abstract class MutableHttpEntity implements HttpEntity {
+abstract class MutableHttpEntity
+//implements HttpEntity
+{
     static final int OUTPUT_BUFFER_SIZE = 4096;
 
     private InputStream content;
@@ -44,55 +37,51 @@ abstract class MutableHttpEntity implements HttpEntity {
         this.contentEncoding = contentEncoding;
         this.chunked = chunked;
     }
+//
+//    @Override
+//    public String getContentEncoding() {
+//        return contentEncoding;
+//    }
+//
+//    @Override
+//    public InputStream getContent() throws IOException, UnsupportedOperationException {
+//        return content;
+//    }
+//
+//    @Override
+//    public boolean isStreaming() {
+//        return false;
+//    }
+//
+//    @Override
+//    public long getContentLength() {
+//        return length;
+//    }
+//
+//    public void setContentLength(long l) {
+//        this.length = l;
+//    }
+//
+//    public void setChunked(boolean chunked) {
+//        this.chunked = chunked;
+//    }
+//
+//    @Override
+//    public boolean isChunked() {
+//        return chunked;
+//    }
+//
+//
+//    @Override
+//    public Supplier<List<? extends Header>> getTrailers() {
+//        return null;
+//    }
+//
+//    @Override
+//    public Set<String> getTrailerNames() {
+//        return Collections.emptySet();
+//    }
 
-    @Override
-    public String getContentEncoding() {
-        return contentEncoding;
-    }
-
-    @Override
-    public InputStream getContent() throws IOException, UnsupportedOperationException {
-        return content;
-    }
-
-    @Override
-    public boolean isStreaming() {
-        return false;
-    }
-
-    @Override
-    public long getContentLength() {
-        return length;
-    }
-
-    public void setContentLength(long l) {
-        this.length = l;
-    }
-
-    public void setChunked(boolean chunked) {
-        this.chunked = chunked;
-    }
-
-    @Override
-    public boolean isChunked() {
-        return chunked;
-    }
-
-    @Override
-    public void close() throws IOException {
-    }
-
-    @Override
-    public Supplier<List<? extends Header>> getTrailers() {
-        return null;
-    }
-
-    @Override
-    public Set<String> getTrailerNames() {
-        return Collections.emptySet();
-    }
-
-    @Override
     public String getContentType() {
         return contentType;
     }
@@ -100,21 +89,31 @@ abstract class MutableHttpEntity implements HttpEntity {
     public void setContentType(String contentType) {
         this.contentType = contentType;
     }
+//
+//    public static void writeTo(final HttpEntity entity, final OutputStream outStream) throws IOException {
+//        try (InputStream inStream = entity.getContent()) {
+//            if (inStream != null) {
+//                int count;
+//                final byte[] tmp = new byte[OUTPUT_BUFFER_SIZE];
+//                while ((count = inStream.read(tmp)) != -1) {
+//                    outStream.write(tmp, 0, count);
+//                }
+//            }
+//        }
+//    }
+//
+//    @Override
+//    public void writeTo(final OutputStream outStream) throws IOException {
+//        writeTo(this, outStream);
+//    }
 
-    public static void writeTo(final HttpEntity entity, final OutputStream outStream) throws IOException {
-        try (InputStream inStream = entity.getContent()) {
-            if (inStream != null) {
-                int count;
-                final byte[] tmp = new byte[OUTPUT_BUFFER_SIZE];
-                while ((count = inStream.read(tmp)) != -1) {
-                    outStream.write(tmp, 0, count);
-                }
-            }
-        }
+    public void setChunked(boolean isChunking) {
+        // TODO Auto-generated method stub
+
     }
 
-    @Override
-    public void writeTo(final OutputStream outStream) throws IOException {
-        writeTo(this, outStream);
+    public void setContentLength(long l) {
+        // TODO Auto-generated method stub
+
     }
 }

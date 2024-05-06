@@ -37,31 +37,12 @@ import org.apache.cxf.transport.http.HTTPConduitFactory;
 import org.apache.cxf.transport.http.HTTPTransportFactory;
 import org.apache.cxf.transports.http.configuration.HTTPClientPolicy;
 import org.apache.cxf.ws.addressing.EndpointReferenceType;
-import org.apache.hc.client5.http.SystemDefaultDnsResolver;
-import org.apache.hc.client5.http.config.TlsConfig;
-import org.apache.hc.client5.http.cookie.BasicCookieStore;
-import org.apache.hc.client5.http.cookie.Cookie;
-import org.apache.hc.client5.http.impl.DefaultSchemePortResolver;
-import org.apache.hc.client5.http.impl.async.CloseableHttpAsyncClient;
-import org.apache.hc.client5.http.impl.async.HttpAsyncClientBuilder;
-import org.apache.hc.client5.http.impl.async.HttpAsyncClients;
-import org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManager;
-import org.apache.hc.client5.http.protocol.RedirectStrategy;
-import org.apache.hc.client5.http.ssl.DefaultClientTlsStrategy;
-import org.apache.hc.core5.http.HttpRequest;
-import org.apache.hc.core5.http.HttpResponse;
-import org.apache.hc.core5.http.ProtocolException;
-import org.apache.hc.core5.http.config.Lookup;
-import org.apache.hc.core5.http.config.RegistryBuilder;
-import org.apache.hc.core5.http.nio.ssl.TlsStrategy;
-import org.apache.hc.core5.http.protocol.HttpContext;
-import org.apache.hc.core5.http2.HttpVersionPolicy;
-import org.apache.hc.core5.pool.PoolConcurrencyPolicy;
-import org.apache.hc.core5.pool.PoolReusePolicy;
-import org.apache.hc.core5.reactor.IOReactorConfig;
-import org.apache.hc.core5.reactor.IOReactorStatus;
-import org.apache.hc.core5.util.TimeValue;
-import org.apache.hc.core5.util.Timeout;
+
+import io.quarkiverse.cxf.vertx.client.AsyncHTTPConduit.TlsStrategy;
+import io.quarkus.arc.Arc;
+import io.vertx.core.Vertx;
+import io.vertx.core.http.HttpClient;
+import io.vertx.core.http.HttpClientOptions;
 
 /**
  *
@@ -122,21 +103,23 @@ public class AsyncHTTPConduitFactory implements HTTPConduitFactory {
      * is necessary to remove per-HTTPClientPolicy caching.
      */
     private static class AsyncClient {
-        private final PoolingAsyncClientConnectionManager connectionManager;
-        private final CloseableHttpAsyncClient client;
+        //private final PoolingAsyncClientConnectionManager connectionManager;
+        private final HttpClient client;
 
-        AsyncClient(PoolingAsyncClientConnectionManager connectionManager, CloseableHttpAsyncClient client) {
-            this.connectionManager = connectionManager;
+        AsyncClient(
+                //PoolingAsyncClientConnectionManager connectionManager,
+                HttpClient client) {
+            //this.connectionManager = connectionManager;
             this.client = client;
         }
 
-        public CloseableHttpAsyncClient getClient() {
+        public HttpClient getClient() {
             return client;
         }
 
-        public PoolingAsyncClientConnectionManager getConnectionManager() {
-            return connectionManager;
-        }
+//        public PoolingAsyncClientConnectionManager getConnectionManager() {
+//            return connectionManager;
+//        }
     }
 
     private volatile Map<HTTPClientPolicy, AsyncClient> clients = new ConcurrentHashMap<>();
@@ -148,12 +131,12 @@ public class AsyncHTTPConduitFactory implements HTTPConduitFactory {
     private int connectionTTL = 60000;
     private int connectionMaxIdle = 60000;
 
-    private int ioThreadCount = IOReactorConfig.DEFAULT.getIoThreadCount();
-    private long selectInterval = IOReactorConfig.DEFAULT.getSelectInterval().toMilliseconds();
-    private int soLinger = IOReactorConfig.DEFAULT.getSoLinger().toMillisecondsIntBound();
-    private int soTimeout = IOReactorConfig.DEFAULT.getSoTimeout().toMillisecondsIntBound();
-    private boolean soKeepalive = IOReactorConfig.DEFAULT.isSoKeepalive();
-    private boolean tcpNoDelay = true;
+//    private int ioThreadCount = IOReactorConfig.DEFAULT.getIoThreadCount();
+//    private long selectInterval = IOReactorConfig.DEFAULT.getSelectInterval().toMilliseconds();
+//    private int soLinger = IOReactorConfig.DEFAULT.getSoLinger().toMillisecondsIntBound();
+//    private int soTimeout = IOReactorConfig.DEFAULT.getSoTimeout().toMillisecondsIntBound();
+//    private boolean soKeepalive = IOReactorConfig.DEFAULT.isSoKeepalive();
+//    private boolean tcpNoDelay = true;
 
     AsyncHTTPConduitFactory() {
         super();
@@ -204,38 +187,39 @@ public class AsyncHTTPConduitFactory implements HTTPConduitFactory {
 
         if (!clients.isEmpty()) {
             for (Map.Entry<HTTPClientPolicy, AsyncClient> entry : clients.entrySet()) {
-                final PoolingAsyncClientConnectionManager connectionManager = entry.getValue().getConnectionManager();
-                connectionManager.setMaxTotal(maxConnections);
-                connectionManager.setDefaultMaxPerRoute(maxPerRoute);
+                throw new IllegalStateException("Cannot set org.apache.cxf.transport.http.async.MAX_CONNECTIONS and org.apache.cxf.transport.http.async.MAX_PER_HOST_CONNECTIONS on existing clients");
+//                final PoolingAsyncClientConnectionManager connectionManager = entry.getValue().getConnectionManager();
+//                connectionManager.setMaxTotal(maxConnections);
+//                connectionManager.setDefaultMaxPerRoute(maxPerRoute);
             }
         }
 
         //properties that need a restart of the reactor
         boolean changed = false;
-
-        int i = ioThreadCount;
-        ioThreadCount = getInt(s.get(THREAD_COUNT), Runtime.getRuntime().availableProcessors());
-        changed |= i != ioThreadCount;
-
-        long l = selectInterval;
-        selectInterval = getInt(s.get(SELECT_INTERVAL), 1000);
-        changed |= l != selectInterval;
-
-        i = soLinger;
-        soLinger = getInt(s.get(SO_LINGER), -1);
-        changed |= i != soLinger;
-
-        i = soTimeout;
-        soTimeout = getInt(s.get(SO_TIMEOUT), 0);
-        changed |= i != soTimeout;
-
-        boolean b = tcpNoDelay;
-        tcpNoDelay = getBoolean(s.get(TCP_NODELAY), true);
-        changed |= b != tcpNoDelay;
-
-        b = soKeepalive;
-        soKeepalive = getBoolean(s.get(SO_KEEPALIVE), false);
-        changed |= b != soKeepalive;
+//
+//        int i = ioThreadCount;
+//        ioThreadCount = getInt(s.get(THREAD_COUNT), Runtime.getRuntime().availableProcessors());
+//        changed |= i != ioThreadCount;
+//
+//        long l = selectInterval;
+//        selectInterval = getInt(s.get(SELECT_INTERVAL), 1000);
+//        changed |= l != selectInterval;
+//
+//        i = soLinger;
+//        soLinger = getInt(s.get(SO_LINGER), -1);
+//        changed |= i != soLinger;
+//
+//        i = soTimeout;
+//        soTimeout = getInt(s.get(SO_TIMEOUT), 0);
+//        changed |= i != soTimeout;
+//
+//        boolean b = tcpNoDelay;
+//        tcpNoDelay = getBoolean(s.get(TCP_NODELAY), true);
+//        changed |= b != tcpNoDelay;
+//
+//        b = soKeepalive;
+//        soKeepalive = getBoolean(s.get(SO_KEEPALIVE), false);
+//        changed |= b != soKeepalive;
 
         return changed;
     }
@@ -290,17 +274,13 @@ public class AsyncHTTPConduitFactory implements HTTPConduitFactory {
         if (!clients.isEmpty()) {
             for (Map.Entry<HTTPClientPolicy, AsyncClient> entry : clients.entrySet()) {
                 shutdown(entry.getValue().getClient());
-                entry.getValue().getConnectionManager().close();
+                //entry.getValue().getConnectionManager().close();
             }
         }
     }
 
-    private static void shutdown(CloseableHttpAsyncClient client) {
-        try {
-            client.close();
-        } catch (IOException ex) {
-            LOG.warning(ex.getMessage());
-        }
+    private static void shutdown(HttpClient client) {
+        client.close();
     }
 
     private void addListener(Bus b) {
@@ -327,132 +307,133 @@ public class AsyncHTTPConduitFactory implements HTTPConduitFactory {
             return;
         }
 
-        clients.computeIfAbsent(clientPolicy, key -> createNIOClient(key, tlsStrategy));
+        clients.computeIfAbsent(clientPolicy, key -> createHttpClient(key, tlsStrategy));
     }
 
-    private AsyncClient createNIOClient(HTTPClientPolicy clientPolicy, final TlsStrategy tlsStrategy) {
-        final IOReactorConfig config = IOReactorConfig.custom()
-                .setIoThreadCount(ioThreadCount)
-                .setSelectInterval(TimeValue.ofMilliseconds(selectInterval))
-                .setSoLinger(TimeValue.ofMilliseconds(soLinger))
-                .setSoTimeout(Timeout.ofMilliseconds(soTimeout))
-                .setSoKeepAlive(soKeepalive)
-                .setTcpNoDelay(tcpNoDelay)
-                .build();
+    private AsyncClient createHttpClient(HTTPClientPolicy clientPolicy, final TlsStrategy tlsStrategy) {
+        HttpClientOptions options = new HttpClientOptions();
+//        final IOReactorConfig config = IOReactorConfig.custom()
+//                .setIoThreadCount(ioThreadCount)
+//                .setSelectInterval(TimeValue.ofMilliseconds(selectInterval))
+//                .setSoLinger(TimeValue.ofMilliseconds(soLinger))
+//                .setSoTimeout(Timeout.ofMilliseconds(soTimeout))
+//                .setSoKeepAlive(soKeepalive)
+//                .setTcpNoDelay(tcpNoDelay)
+//                .build();
+//
+//        final Lookup<TlsStrategy> tlsLookupStrategy = RegistryBuilder.<TlsStrategy> create()
+//                .register("https", (tlsStrategy != null) ? tlsStrategy : DefaultClientTlsStrategy.getSystemDefault())
+//                .build();
 
-        final Lookup<TlsStrategy> tlsLookupStrategy = RegistryBuilder.<TlsStrategy> create()
-                .register("https", (tlsStrategy != null) ? tlsStrategy : DefaultClientTlsStrategy.getSystemDefault())
-                .build();
+//        final PoolingAsyncClientConnectionManager connectionManager = new PoolingAsyncClientConnectionManager(
+//                tlsLookupStrategy,
+//                PoolConcurrencyPolicy.STRICT,
+//                PoolReusePolicy.LIFO,
+//                TimeValue.ofMilliseconds(connectionTTL),
+//                DefaultSchemePortResolver.INSTANCE,
+//                SystemDefaultDnsResolver.INSTANCE);
 
-        final PoolingAsyncClientConnectionManager connectionManager = new PoolingAsyncClientConnectionManager(
-                tlsLookupStrategy,
-                PoolConcurrencyPolicy.STRICT,
-                PoolReusePolicy.LIFO,
-                TimeValue.ofMilliseconds(connectionTTL),
-                DefaultSchemePortResolver.INSTANCE,
-                SystemDefaultDnsResolver.INSTANCE);
-
-        connectionManager.setDefaultMaxPerRoute(maxPerRoute);
-        connectionManager.setMaxTotal(maxConnections);
+//        connectionManager.setDefaultMaxPerRoute(maxPerRoute);
+//        connectionManager.setMaxTotal(maxConnections);
 
         if (!"2.0".equals(clientPolicy.getVersion())) {
-            connectionManager.setDefaultTlsConfig(TlsConfig
-                    .custom()
-                    .setVersionPolicy(HttpVersionPolicy.FORCE_HTTP_1)
-                    .build());
+//            connectionManager.setDefaultTlsConfig(TlsConfig
+//                    .custom()
+//                    .setVersionPolicy(HttpVersionPolicy.FORCE_HTTP_1)
+//                    .build());
         }
+//
+//        final RedirectStrategy redirectStrategy = new RedirectStrategy() {
+//            public boolean isRedirected(HttpRequest request, HttpResponse response, HttpContext context)
+//                    throws ProtocolException {
+//                return false;
+//            }
+//
+//            public URI getLocationURI(HttpRequest request, HttpResponse response, HttpContext context)
+//                    throws ProtocolException {
+//                return null;
+//            }
+//        };
+//
+//        final HttpAsyncClientBuilder httpAsyncClientBuilder = HttpAsyncClients
+//                .custom()
+//                .setConnectionManager(connectionManager)
+//                .setRedirectStrategy(redirectStrategy)
+//                .setDefaultCookieStore(new BasicCookieStore() {
+//                    private static final long serialVersionUID = 1L;
+//
+//                    public void addCookie(Cookie cookie) {
+//                    }
+//                });
+//        adaptClientBuilder(httpAsyncClientBuilder);
 
-        final RedirectStrategy redirectStrategy = new RedirectStrategy() {
-            public boolean isRedirected(HttpRequest request, HttpResponse response, HttpContext context)
-                    throws ProtocolException {
-                return false;
-            }
+        final Vertx vertx = Arc.container().instance(Vertx.class).get();
+        final HttpClient client = vertx.createHttpClient(options);
 
-            public URI getLocationURI(HttpRequest request, HttpResponse response, HttpContext context)
-                    throws ProtocolException {
-                return null;
-            }
-        };
+//        // Start the client thread
+//        client.start();
+//        //Always start the idle checker thread to validate pending requests and
+//        //use the ConnectionMaxIdle to close the idle connection
+//        new CloseIdleConnectionThread(connectionManager, client).start();
 
-        final HttpAsyncClientBuilder httpAsyncClientBuilder = HttpAsyncClients
-                .custom()
-                .setConnectionManager(connectionManager)
-                .setRedirectStrategy(redirectStrategy)
-                .setDefaultCookieStore(new BasicCookieStore() {
-                    private static final long serialVersionUID = 1L;
-
-                    public void addCookie(Cookie cookie) {
-                    }
-                });
-        adaptClientBuilder(httpAsyncClientBuilder);
-
-        final CloseableHttpAsyncClient client = httpAsyncClientBuilder
-                .setIOReactorConfig(config)
-                .build();
-
-        // Start the client thread
-        client.start();
-        //Always start the idle checker thread to validate pending requests and
-        //use the ConnectionMaxIdle to close the idle connection
-        new CloseIdleConnectionThread(connectionManager, client).start();
-
-        return new AsyncClient(connectionManager, client);
+        return new AsyncClient(//connectionManager,
+                client);
     }
 
     //provide a hook to customize the builder
-    protected void adaptClientBuilder(HttpAsyncClientBuilder httpAsyncClientBuilder) {
-    }
+//    protected void adaptClientBuilder(HttpAsyncClientBuilder httpAsyncClientBuilder) {
+//    }
 
-    public CloseableHttpAsyncClient createClient(final AsyncHTTPConduit c, final TlsStrategy tlsStrategy)
+    public HttpClient createClient(final AsyncHTTPConduit c, final TlsStrategy tlsStrategy)
             throws IOException {
 
         return clients
-                .computeIfAbsent(c.getClient(), key -> createNIOClient(key, tlsStrategy))
+                .computeIfAbsent(c.getClient(), key -> createHttpClient(key, tlsStrategy))
                 .getClient();
     }
 
     int getMaxConnections() {
         return maxConnections;
     }
-
-    public class CloseIdleConnectionThread extends Thread {
-        private final PoolingAsyncClientConnectionManager connMgr;
-        private final CloseableHttpAsyncClient client;
-
-        public CloseIdleConnectionThread(PoolingAsyncClientConnectionManager connMgr, CloseableHttpAsyncClient client) {
-            super("CXFCloseIdleConnectionThread");
-            this.connMgr = connMgr;
-            this.client = client;
-        }
-
-        @Override
-        public void run() {
-            long nextIdleCheck = System.currentTimeMillis() + connectionMaxIdle;
-            try {
-                while (client.getStatus() == IOReactorStatus.ACTIVE) {
-                    synchronized (this) {
-                        sleep(selectInterval);
-
-                        if (connectionTTL == 0
-                                && connectionMaxIdle > 0 && System.currentTimeMillis() >= nextIdleCheck) {
-                            nextIdleCheck += connectionMaxIdle;
-                            // close connections
-                            // that have been idle longer than specified connectionMaxIdle
-                            connMgr.closeIdle(TimeValue.ofMilliseconds(connectionMaxIdle));
-                        }
-                    }
-                }
-            } catch (InterruptedException ex) {
-                // terminate
-            }
-        }
-    }
+//
+//    public class CloseIdleConnectionThread extends Thread {
+//        private final PoolingAsyncClientConnectionManager connMgr;
+//        private final CloseableHttpAsyncClient client;
+//
+//        public CloseIdleConnectionThread(PoolingAsyncClientConnectionManager connMgr, CloseableHttpAsyncClient client) {
+//            super("CXFCloseIdleConnectionThread");
+//            this.connMgr = connMgr;
+//            this.client = client;
+//        }
+//
+//        @Override
+//        public void run() {
+//            long nextIdleCheck = System.currentTimeMillis() + connectionMaxIdle;
+//            try {
+//                while (client.getStatus() == IOReactorStatus.ACTIVE) {
+//                    synchronized (this) {
+//                        sleep(selectInterval);
+//
+//                        if (connectionTTL == 0
+//                                && connectionMaxIdle > 0 && System.currentTimeMillis() >= nextIdleCheck) {
+//                            nextIdleCheck += connectionMaxIdle;
+//                            // close connections
+//                            // that have been idle longer than specified connectionMaxIdle
+//                            connMgr.closeIdle(TimeValue.ofMilliseconds(connectionMaxIdle));
+//                        }
+//                    }
+//                }
+//            } catch (InterruptedException ex) {
+//                // terminate
+//            }
+//        }
+//    }
 
     public void close(HTTPClientPolicy clientPolicy) {
         final AsyncClient client = clients.remove(clientPolicy);
         if (client != null) {
             shutdown(client.getClient());
-            client.getConnectionManager().close();
+            //client.getConnectionManager().close();
         }
     }
 }

@@ -7,7 +7,6 @@ import org.apache.cxf.transport.http.HTTPConduitFactory;
 import org.apache.cxf.workqueue.WorkQueueManager;
 import org.eclipse.microprofile.context.ManagedExecutor;
 
-import io.quarkiverse.cxf.vertx.client.AsyncHttpResponseWrapperFactory;
 import io.quarkus.arc.Arc;
 import io.quarkus.arc.InstanceHandle;
 import io.quarkus.runtime.RuntimeValue;
@@ -32,7 +31,6 @@ public class Hc5Recorder {
             } else {
                 throw new IllegalStateException(ManagedExecutor.class.getName() + " not available in Arc");
             }
-            bus.setExtension(new QuarkusAsyncHttpResponseWrapperFactory(), AsyncHttpResponseWrapperFactory.class);
         });
     }
 }

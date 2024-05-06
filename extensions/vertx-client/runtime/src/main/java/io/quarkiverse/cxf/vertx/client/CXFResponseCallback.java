@@ -19,7 +19,6 @@
 
 package io.quarkiverse.cxf.vertx.client;
 
-import org.apache.hc.core5.http.HttpResponse;
 
 interface CXFResponseCallback {
     void responseReceived(HttpResponse response);

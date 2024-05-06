@@ -22,58 +22,73 @@ package io.quarkiverse.cxf.vertx.client;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 
 import org.apache.cxf.io.CachedOutputStream;
-import org.apache.hc.core5.http.HttpException;
-import org.apache.hc.core5.http.nio.AsyncRequestProducer;
-import org.apache.hc.core5.http.nio.DataStreamChannel;
-import org.apache.hc.core5.http.nio.RequestChannel;
-import org.apache.hc.core5.http.protocol.HttpContext;
 
-public class CXFHttpAsyncRequestProducer implements AsyncRequestProducer {
+import io.vertx.core.AsyncResult;
+import io.vertx.core.Handler;
+import io.vertx.core.Vertx;
+import io.vertx.core.buffer.Buffer;
+import io.vertx.core.file.FileSystem;
+import io.vertx.core.http.HttpClientRequest;
+import io.vertx.core.impl.future.FailedFuture;
+import io.vertx.core.impl.future.SucceededFuture;
+import io.vertx.ext.web.handler.HttpException;
+
+public class CXFHttpAsyncRequestProducer  {
     private final CXFHttpRequest request;
     private final SharedOutputBuffer buf;
     private volatile CachedOutputStream content;
-    private volatile ByteBuffer buffer;
+    private volatile Buffer buffer;
     private volatile InputStream fis;
     private volatile ReadableByteChannel chan;
+    private final Vertx vertx;
+    private FileSystem fs;
 
-    public CXFHttpAsyncRequestProducer(final CXFHttpRequest request, final SharedOutputBuffer buf) {
+    public CXFHttpAsyncRequestProducer(Vertx vertx, final CXFHttpRequest request, final SharedOutputBuffer buf) {
         super();
+        this.vertx = vertx;
         this.buf = buf;
         this.request = request;
     }
 
-    @Override
-    public void produce(DataStreamChannel channel) throws IOException {
+    public void produce(HttpClientRequest request, Handler<AsyncResult<Void>> callerCallback) {
         if (content != null) {
             if (buffer == null) {
                 if (content.getTempFile() == null) {
-                    buffer = ByteBuffer.wrap(content.getBytes());
+                    buffer = Buffer.buffer(content.getBytes());
+                    request.end(buffer);
+                    callerCallback.handle(SucceededFuture.EMPTY);
                 } else {
-                    fis = content.getInputStream();
-                    chan = (fis instanceof FileInputStream)
-                            ? ((FileInputStream) fis).getChannel()
-                            : Channels.newChannel(fis);
-                    buffer = ByteBuffer.allocate(8 * 1024);
+                    fs = vertx.fileSystem();
+                    // FIXME: we need to chunk for large files
+                    fs.readFile(content.getTempFile().toString(), result -> {
+                        if (result.succeeded()) {
+                            Buffer buffer = result.result();
+                            request.end(buffer);
+                            callerCallback.handle(SucceededFuture.EMPTY);
+                        } else {
+                            callerCallback.handle(new FailedFuture<>(result.cause()));
+                        }
+                    });
                 }
             }
             int i = -1;
-            ((Buffer) buffer).rewind();
-            if (buffer.hasRemaining() && chan != null) {
+            //((Buffer) buffer).rewind();
+            if (fs != null) {
+
                 i = chan.read(buffer);
                 buffer.flip();
             }
-            channel.write(buffer);
+            request.write(buffer);
             if (!buffer.hasRemaining() && i == -1) {
-                channel.endStream();
+                request.endStream();
             }
         } else {
-            buf.produceContent(channel);
+            buf.produceContent(request);
         }
     }
 
