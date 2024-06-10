@@ -1,3 +1,2 @@
-io.quarkiverse.cxf.vertx.client.AsyncHTTPConduitFactory:org.apache.cxf.transport.http.HTTPConduitFactory:true:true
-io.quarkiverse.cxf.vertx.client.AsyncHttpTransportFactory:org.apache.cxf.transport.ConduitInitiator:true:true
+io.quarkiverse.cxf.vertx.web.client.VertxWebClientHTTPConduitFactory:org.apache.cxf.transport.http.HTTPConduitFactory:true:true
 

@@ -17,8 +17,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import io.quarkiverse.cxf.annotation.CXFClient;
-import io.quarkiverse.cxf.vertx.client.AsyncHTTPConduit;
-import io.quarkiverse.cxf.vertx.client.AsyncHTTPConduitFactory;
+import io.quarkiverse.cxf.vertx.web.client.AsyncHTTPConduit;
+import io.quarkiverse.cxf.vertx.web.client.AsyncHTTPConduitFactory;
 import io.quarkus.test.QuarkusUnitTest;
 
 public class Hc5ConduitFactoryTest {

@@ -9,9 +9,15 @@ import io.quarkus.deployment.annotations.BuildProducer;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.annotations.ExecutionTime;
 import io.quarkus.deployment.annotations.Record;
+import io.quarkus.deployment.builditem.FeatureBuildItem;
 import io.quarkus.deployment.builditem.nativeimage.RuntimeInitializedClassBuildItem;
 
 public class QuarkusCxfTransportsHTTPAsyncProcessor {
+
+    @BuildStep
+    FeatureBuildItem feature() {
+        return new FeatureBuildItem("cxf-rt-transports-http-hc5");
+    }
 
     @BuildStep
     List<RuntimeInitializedClassBuildItem> runtimeInitializedClasses() {

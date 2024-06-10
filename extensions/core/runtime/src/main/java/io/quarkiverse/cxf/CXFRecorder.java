@@ -27,6 +27,7 @@ import io.vertx.ext.web.RoutingContext;
 public class CXFRecorder {
     private static final Logger LOGGER = Logger.getLogger(CXFRecorder.class);
     private static boolean hc5Present = false;
+    private static boolean vertxWebClientPresent = false;
 
     /**
      * Stores the given {@link CXFClientData} in the application.
@@ -285,5 +286,13 @@ public class CXFRecorder {
 
     public static boolean isHc5Present() {
         return hc5Present;
+    }
+
+    public void setVertxWebClientPresent() {
+        vertxWebClientPresent = true;
+    }
+
+    public static boolean isVertxWebClientPresent() {
+        return vertxWebClientPresent;
     }
 }
