@@ -20,65 +20,73 @@
 package io.quarkiverse.cxf.vertx.web.client;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.security.Principal;
 import java.security.cert.Certificate;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.SSLSession;
 
 import org.apache.cxf.Bus;
 import org.apache.cxf.common.util.PropertyUtils;
 import org.apache.cxf.configuration.jsse.TLSClientParameters;
 import org.apache.cxf.helpers.HttpHeaderHelper;
+import org.apache.cxf.io.CacheAndWriteOutputStream;
 import org.apache.cxf.message.Message;
 import org.apache.cxf.message.MessageUtils;
 import org.apache.cxf.service.model.EndpointInfo;
 import org.apache.cxf.transport.http.Address;
+import org.apache.cxf.transport.http.Cookies;
 import org.apache.cxf.transport.http.HTTPConduit;
 import org.apache.cxf.transport.http.Headers;
-import org.apache.cxf.transport.http.netty.client.CxfResponseCallBack;
-import org.apache.cxf.transport.http.netty.client.NettyHttpClientPipelineFactory;
 import org.apache.cxf.transport.https.HttpsURLConnectionInfo;
 import org.apache.cxf.transports.http.configuration.HTTPClientPolicy;
 import org.apache.cxf.version.Version;
 
+import io.netty.buffer.ByteBufInputStream;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
-import io.netty.handler.ssl.SslHandler;
-import io.quarkiverse.cxf.vertx.web.client.VertxWebClientHTTPConduitFactory.SharedClient;
 import io.vertx.core.Future;
+import io.vertx.core.Handler;
+import io.vertx.core.MultiMap;
+import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
+import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.ext.web.client.HttpRequest;
 import io.vertx.ext.web.client.HttpResponse;
 import io.vertx.ext.web.client.WebClient;
+import io.vertx.ext.web.client.impl.ClientPhase;
+import io.vertx.ext.web.client.impl.HttpContext;
+import io.vertx.ext.web.client.impl.WebClientInternal;
 
 /**
  */
 public class VertxWebClientHTTPConduit extends HTTPConduit {
 
-    private final WebClient webClient;
-    private final SharedClient sharedWebClient;
+    private final HttpClient httpClient;
 
-    public VertxWebClientHTTPConduit(Bus b, EndpointInfo ei, SharedClient sharedWebClient) throws IOException {
+    public VertxWebClientHTTPConduit(Bus b, EndpointInfo ei, HttpClient httpClient) throws IOException {
         super(b, ei);
-        this.sharedWebClient = sharedWebClient;
-        this.webClient = sharedWebClient.lease();
+        this.httpClient = httpClient;
     }
 
     @Override
     protected void setupConnection(Message message, Address address, HTTPClientPolicy csPolicy) throws IOException {
-        URI uri = address.getURI();
-        message.put("http.scheme", uri.getScheme());
+        final URI uri = address.getURI();
+        final String scheme = uri.getScheme();
+        message.put("http.scheme", scheme);
         final HttpMethod method;
         String rawRequestMethod = (String) message.get(Message.HTTP_REQUEST_METHOD);
         if (rawRequestMethod == null) {
@@ -92,80 +100,110 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
             verc = csPolicy.getVersion();
         }
 
+        final WebClientInternal webClient = (WebClientInternal) WebClient.wrap(httpClient);
+
+        final SslSessionHolder sslSessionHolder = new SslSessionHolder(csPolicy.getConnectionTimeout());
+        if ("https".equals(scheme)) {
+            webClient.addInterceptor(sslSessionHolder);
+        }
+
         final HttpRequest<Buffer> request = webClient
                 .request(method, uri.toString())
-                .connectTimeout(csPolicy.getConnectionTimeout());
-        message.put(RequestData.class, new RequestData(request, uri, csPolicy));
+                .connectTimeout(csPolicy.getConnectionTimeout())
+                ;
+        message.put(RequestContext.class, sslSessionHolder.createRequestContext(request, uri, csPolicy));
 
     }
 
     @Override
     protected OutputStream createOutputStream(Message message, boolean possibleRetransmit, boolean isChunking,
             int chunkThreshold) throws IOException {
-        final RequestData requestData = message.get(RequestData.class);
+        final RequestContext requestContext = message.get(RequestContext.class);
         return new VertxWebClientWrappedOutputStream(message, possibleRetransmit, isChunking, chunkThreshold, getConduitName(),
-                requestData);
+                requestContext);
     }
 
-    @Override
-    public void close() {
-        super.close();
-        sharedWebClient.release();
+    static record RequestContext(HttpRequest<Buffer> request, URI uri, HTTPClientPolicy httpClientPolicy, SslSessionHolder sslSessionHolder) {
     }
 
-    static record RequestData(HttpRequest<Buffer> request, URI uri, HTTPClientPolicy httpClientPolicy) {
+    static class SslSessionHolder implements Handler<HttpContext<?>> {
+
+        private final long connectTimeout;
+        private final Lock lock = new ReentrantLock();
+        private final Condition connected = lock.newCondition();
+        private SSLSession sslSession;
+
+        public SSLSession getOrAwaitSslSession() throws IOException {
+            lock.lock();
+            try {
+                if (sslSession == null) {
+                    try {
+                        connected.await(connectTimeout, TimeUnit.MILLISECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new IOException(e);
+                    }
+                    if (sslSession == null) {
+                        throw new SocketTimeoutException("Timeout waiting for SSL Session");
+                    }
+                }
+                return sslSession;
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        public RequestContext createRequestContext(HttpRequest<Buffer> request, URI uri, HTTPClientPolicy csPolicy) {
+            return new RequestContext(request, uri, csPolicy, this);
+        }
+
+        public SslSessionHolder(long connectTimeout) {
+            super();
+            this.connectTimeout = connectTimeout;
+        }
+
+        @Override
+        public void handle(HttpContext<?> ctx) {
+            if (ctx.phase() == ClientPhase.RECEIVE_RESPONSE) {
+                final SSLSession sslSession = ctx.clientResponse().netSocket().sslSession();
+                lock.lock();
+                try {
+                    this.sslSession = sslSession;
+                    connected.notify();
+                } finally {
+                    lock.unlock();
+                }
+            }
+        }
+
     }
 
     public static class VertxWebClientWrappedOutputStream extends WrappedOutputStream {
 
-        private final RequestData requestData;
+        private final RequestContext requestContext;
         private final Buffer buffer;
-        private final Lock lock = new ReentrantLock();
-        private final Condition responded = lock.newCondition();
+        private final Lock lock;
+        private final Condition headersReceived;
 
         private HttpResponse<Buffer> response;
         private Throwable exception;
+        private Cookies cookies;
 
         @SuppressWarnings("unchecked")
         protected VertxWebClientWrappedOutputStream(Message message, boolean possibleRetransmit,
-                boolean isChunking, int chunkThreshold, String conduitName, RequestData requestData) {
-            super(message, possibleRetransmit, isChunking, chunkThreshold, conduitName, requestData.uri());
-            this.requestData = requestData;
-            final HTTPClientPolicy csPolicy = requestData.httpClientPolicy();
+                boolean isChunking, int chunkThreshold, String conduitName, RequestContext requestContext) {
+            super(message, possibleRetransmit, isChunking, chunkThreshold, conduitName, requestContext.uri());
+            this.requestContext = requestContext;
+            this.lock = requestContext.sslSessionHolder.lock; // must be the same lock
+            this.headersReceived = lock.newCondition();
+
+            final HTTPClientPolicy csPolicy = requestContext.httpClientPolicy();
             int bufSize = csPolicy.getChunkLength() > 0 ? csPolicy.getChunkLength() : 16320;
             this.buffer = Buffer.buffer(bufSize);
             this.wrappedStream = new BufferOutputStream(buffer);
         }
 
-        protected void connect(boolean output) {
-            final HttpRequest<Buffer> req = requestData.request()
-            // .idleTimeout(threshold)
-            ;
 
-            final Future<HttpResponse<Buffer>> sendBufferState = output
-                    ? req.sendBuffer(buffer)
-                    : req.send();
-
-            sendBufferState
-                    .onSuccess(r -> {
-                        lock.lock();
-                        try {
-                            response = r;
-                            responded.signal();
-                        } finally {
-                            lock.unlock();
-                        }
-                    })
-                    .onFailure(e -> {
-                        lock.lock();
-                        try {
-                            exception = e;
-                            responded.signal();
-                        } finally {
-                            lock.unlock();
-                        }
-                    });
-        }
 
         protected HttpResponse<Buffer> getOrAwaitResponse() throws IOException {
             lock.lock();
@@ -173,7 +211,7 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
                 while (response == null) {
                     if (exception == null) {
                         try {
-                            responded.await(requestData.httpClientPolicy().getReceiveTimeout(), TimeUnit.MILLISECONDS);
+                            headersReceived.await(requestContext.httpClientPolicy().getReceiveTimeout(), TimeUnit.MILLISECONDS);
                         } catch (InterruptedException e) {
                             Thread.currentThread().interrupt();
                             throw new IOException(e);
@@ -200,12 +238,67 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
             }
         }
 
+
+
+        @Override
+        protected void setupWrappedStream() throws IOException {
+            connect(true);
+
+            // If we need to cache for retransmission, store data in a
+            // CacheAndWriteOutputStream. Otherwise write directly to the output stream.
+            if (cachingForRetransmission) {
+                cachedStream = new CacheAndWriteOutputStream(wrappedStream);
+                wrappedStream = cachedStream;
+            }
+        }
+
         @Override
         protected void handleNoOutput() throws IOException {
             connect(false);
         }
 
+        protected TLSClientParameters findTLSClientParameters() {
+            TLSClientParameters clientParameters = outMessage.get(TLSClientParameters.class);
+            if (clientParameters == null) {
+                clientParameters = getTlsClientParameters();
+            }
+            if (clientParameters == null) {
+                clientParameters = new TLSClientParameters();
+            }
+            return clientParameters;
+        }
 
+
+
+        protected void connect(boolean output) {
+            final HttpRequest<Buffer> req = requestContext.request()
+            // .idleTimeout(threshold)
+            ;
+
+            final Future<HttpResponse<Buffer>> sendBufferState = output
+                    ? req.sendBuffer(buffer)
+                    : req.send();
+
+            sendBufferState
+                    .onSuccess(r -> {
+                        lock.lock();
+                        try {
+                            response = r;
+                            headersReceived.signal();
+                        } finally {
+                            lock.unlock();
+                        }
+                    })
+                    .onFailure(e -> {
+                        lock.lock();
+                        try {
+                            exception = e;
+                            headersReceived.signal();
+                        } finally {
+                            lock.unlock();
+                        }
+                    });
+        }
 
         @Override
         protected HttpsURLConnectionInfo getHttpsURLConnectionInfo() throws IOException {
@@ -215,13 +308,14 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
             connect(true);
 
             HostnameVerifier verifier = org.apache.cxf.transport.https.SSLUtils
-                .getHostnameVerifier(findTLSClientParameters());
+                    .getHostnameVerifier(findTLSClientParameters());
 
+            final SSLSession session = requestContext.sslSessionHolder.getOrAwaitSslSession();
             if (!verifier.verify(url.getHost(), session)) {
                 throw new IOException("Could not verify host " + url.getHost());
             }
 
-            String method = (String)outMessage.get(Message.HTTP_REQUEST_METHOD);
+            String method = (String) outMessage.get(Message.HTTP_REQUEST_METHOD);
             String cipherSuite = null;
             Certificate[] localCerts = null;
             Principal principal = null;
@@ -243,14 +337,16 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
             Headers h = new Headers(outMessage);
             setContentTypeHeader(h);
             boolean addHeaders = MessageUtils.getContextualBoolean(outMessage, Headers.ADD_HEADERS_PROPERTY, false);
+            final HttpRequest<Buffer> req = requestContext.request();
 
             for (Map.Entry<String, List<String>> header : h.headerMap().entrySet()) {
                 if (HttpHeaderHelper.CONTENT_TYPE.equalsIgnoreCase(header.getKey())) {
                     continue;
                 }
+                MultiMap headers = req.headers();
                 if (addHeaders || HttpHeaderHelper.COOKIE.equalsIgnoreCase(header.getKey())) {
                     for (String s : header.getValue()) {
-                        entity.getRequest().headers().add(HttpHeaderHelper.COOKIE, s);
+                        headers.add(HttpHeaderHelper.COOKIE, s);
                     }
                 } else if (!"Content-Length".equalsIgnoreCase(header.getKey())) {
                     StringBuilder b = new StringBuilder();
@@ -260,10 +356,10 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
                             b.append(',');
                         }
                     }
-                    entity.getRequest().headers().set(header.getKey(), b.toString());
+                    headers.set(header.getKey(), b.toString());
                 }
-                if (!entity.getRequest().headers().contains("User-Agent")) {
-                    entity.getRequest().headers().set("User-Agent", Version.getCompleteVersionString());
+                if (!headers.contains("User-Agent")) {
+                    headers.set("User-Agent", Version.getCompleteVersionString());
                 }
             }
         }
@@ -276,11 +372,74 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
                         || PropertyUtils.isTrue(outMessage.get(Headers.EMPTY_REQUEST_PROPERTY));
                 // If it is not an empty request then add a content type
                 if (!emptyRequest) {
-                    entity.getRequest().headers().set(Message.CONTENT_TYPE, headers.determineContentType());
+                    requestContext.request().headers().set(Message.CONTENT_TYPE, headers.determineContentType());
                 }
             } else {
-                entity.getRequest().headers().set(Message.CONTENT_TYPE, headers.determineContentType());
+                requestContext.request().headers().set(Message.CONTENT_TYPE, headers.determineContentType());
             }
+        }
+
+        @Override
+        protected void setFixedLengthStreamingMode(int i) {
+            // Here we can set the Content-Length
+            HttpRequest<Buffer> request = requestContext.request();
+            request.headers().set("Content-Length", String.valueOf(i));
+        }
+
+        @Override
+        protected int getResponseCode() throws IOException {
+            return getOrAwaitResponse().statusCode();
+        }
+
+        @Override
+        protected String getResponseMessage() throws IOException {
+            return getOrAwaitResponse().statusMessage();
+        }
+
+        @Override
+        protected void updateResponseHeaders(Message inMessage) throws IOException {
+            Headers h = new Headers(inMessage);
+            inMessage.put(Message.CONTENT_TYPE, readHeaders(h));
+            cookies.readFromHeaders(h);
+        }
+
+
+        private String readHeaders(Headers h) throws IOException {
+            MultiMap responseHeaders = getOrAwaitResponse().headers();
+            Set<String> headerNames = responseHeaders.names();
+            String ct = null;
+            for (String name : headerNames) {
+                List<String> s = responseHeaders.getAll(name);
+                h.headerMap().put(name, s);
+                if (Message.CONTENT_TYPE.equalsIgnoreCase(name)) {
+                    ct = responseHeaders.get(name);
+                }
+            }
+            return ct;
+        }
+
+        @Override
+        protected void handleResponseAsync() throws IOException {
+            // we are always async
+        }
+
+        @Override
+        protected void closeInputStream() throws IOException {
+            //We just clear the buffer
+            getHttpResponseContent().content().clear();
+        }
+
+
+        @Override
+        protected boolean usingProxy() {
+            // TODO we need to support it
+            return false;
+        }
+
+        @Override
+        protected InputStream getInputStream() throws IOException {
+            getOrAwaitResponse().body()
+            return new ByteBufInputStream(getHttpResponseContent().content());
         }
 
     }
