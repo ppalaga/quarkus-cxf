@@ -3,6 +3,8 @@ package io.quarkiverse.cxf.vertx.web.client;
 import java.io.IOException;
 import java.io.OutputStream;
 
+import org.jboss.logging.Logger;
+
 import io.vertx.core.buffer.Buffer;
 
 /**
@@ -10,6 +12,7 @@ import io.vertx.core.buffer.Buffer;
  * written in given {@link Buffer} instance.
  */
 public class BufferOutputStream extends OutputStream {
+    private static final Logger log = Logger.getLogger(VertxWebClientHTTPConduit.class);
 
     private final Buffer buffer;
 
@@ -19,6 +22,7 @@ public class BufferOutputStream extends OutputStream {
 
     @Override
     public void write(byte[] b, int off, int len) throws IOException {
+        log.warn("=== writing " + new String(b));
         buffer.appendBytes(b, off, len);
     }
 

@@ -49,12 +49,12 @@ import org.apache.cxf.message.Message;
 import org.apache.cxf.message.MessageUtils;
 import org.apache.cxf.service.model.EndpointInfo;
 import org.apache.cxf.transport.http.Address;
-import org.apache.cxf.transport.http.Cookies;
 import org.apache.cxf.transport.http.HTTPConduit;
 import org.apache.cxf.transport.http.Headers;
 import org.apache.cxf.transport.https.HttpsURLConnectionInfo;
 import org.apache.cxf.transports.http.configuration.HTTPClientPolicy;
 import org.apache.cxf.version.Version;
+import org.jboss.logging.Logger;
 
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
@@ -74,6 +74,8 @@ import io.vertx.ext.web.client.impl.WebClientInternal;
 /**
  */
 public class VertxWebClientHTTPConduit extends HTTPConduit {
+
+    private static final Logger log = Logger.getLogger(VertxWebClientHTTPConduit.class);
 
     private final HttpClient httpClient;
 
@@ -126,9 +128,13 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
             webClient.addInterceptor(sslSessionHolder);
         }
 
+        final String query = uri.getQuery();
+        final String pathAndQuery = query != null && !query.isEmpty()
+                ? uri.getPath() + "?" + query
+                : uri.getPath();
         final HttpRequest<Buffer> request = webClient
-                .request(method, uri.toString())
-                .connectTimeout(determineConnectionTimeout(message, csPolicy));
+                .request(method, uri.getPort(), uri.getHost(), pathAndQuery);
+        request.connectTimeout(determineConnectionTimeout(message, csPolicy));
         message.put(RequestContext.class, sslSessionHolder.createRequestContext(request, uri, csPolicy));
 
     }
@@ -178,6 +184,7 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
         }
 
         public RequestContext createRequestContext(HttpRequest<Buffer> request, URI uri, HTTPClientPolicy csPolicy) {
+            System.out.println("==== creating RequestContext with req " + request);
             return new RequestContext(request, uri, csPolicy, this);
         }
 
@@ -193,7 +200,7 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
                 lock.lock();
                 try {
                     this.sslSession = sslSession;
-                    connected.notify();
+                    connected.signal();
                 } finally {
                     lock.unlock();
                 }
@@ -211,7 +218,6 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
 
         private HttpResponse<Buffer> response;
         private Throwable exception;
-        private Cookies cookies;
 
         @SuppressWarnings("unchecked")
         protected VertxWebClientWrappedOutputStream(Message message, boolean possibleRetransmit,
@@ -294,6 +300,7 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
             // .idleTimeout(threshold)
             ;
 
+            log.warn("=== sending buffer " + buffer.length());
             final Future<HttpResponse<Buffer>> sendBufferState = output
                     ? req.sendBuffer(buffer)
                     : req.send();
@@ -541,6 +548,7 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
         protected void updateCookiesBeforeRetransmit() throws IOException {
             Headers h = new Headers();
             readHeaders(h);
+            System.out.println("==== cookies = " + cookies);
             cookies.readFromHeaders(h);
         }
 
