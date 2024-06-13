@@ -22,8 +22,11 @@ package io.quarkiverse.cxf.vertx.web.client;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.PushbackInputStream;
+import java.net.HttpURLConnection;
 import java.net.SocketTimeoutException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.security.Principal;
 import java.security.cert.Certificate;
 import java.util.List;
@@ -53,20 +56,17 @@ import org.apache.cxf.transport.https.HttpsURLConnectionInfo;
 import org.apache.cxf.transports.http.configuration.HTTPClientPolicy;
 import org.apache.cxf.version.Version;
 
-import io.netty.buffer.ByteBufInputStream;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.MultiMap;
-import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpMethod;
+import io.vertx.core.http.HttpVersion;
 import io.vertx.ext.web.client.HttpRequest;
 import io.vertx.ext.web.client.HttpResponse;
 import io.vertx.ext.web.client.WebClient;
+import io.vertx.ext.web.client.WebClientOptions;
 import io.vertx.ext.web.client.impl.ClientPhase;
 import io.vertx.ext.web.client.impl.HttpContext;
 import io.vertx.ext.web.client.impl.WebClientInternal;
@@ -84,9 +84,23 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
 
     @Override
     protected void setupConnection(Message message, Address address, HTTPClientPolicy csPolicy) throws IOException {
+
         final URI uri = address.getURI();
         final String scheme = uri.getScheme();
         message.put("http.scheme", scheme);
+
+        // check tlsClientParameters from message header
+        TLSClientParameters clientParameters = message.get(TLSClientParameters.class);
+        if (clientParameters == null) {
+            clientParameters = tlsClientParameters;
+        }
+        if ("https".equals(uri.getScheme())
+                && clientParameters != null
+                && clientParameters.getSSLSocketFactory() != null) {
+            throw new IllegalStateException("Cannot use SSLSocketFactory set via TLSClientParameters");
+        }
+        message.put("use.async.http.conduit", Boolean.TRUE);
+
         final HttpMethod method;
         String rawRequestMethod = (String) message.get(Message.HTTP_REQUEST_METHOD);
         if (rawRequestMethod == null) {
@@ -95,12 +109,17 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
         } else {
             method = HttpMethod.valueOf(rawRequestMethod);
         }
+        final WebClientOptions opts = new WebClientOptions();
+
         String verc = (String) message.getContextualProperty(FORCE_HTTP_VERSION);
         if (verc == null) {
             verc = csPolicy.getVersion();
         }
+        if (verc != null && "2".equals(verc)) {
+            opts.setProtocolVersion(HttpVersion.HTTP_2);
+        }
 
-        final WebClientInternal webClient = (WebClientInternal) WebClient.wrap(httpClient);
+        final WebClientInternal webClient = (WebClientInternal) WebClient.wrap(httpClient, opts);
 
         final SslSessionHolder sslSessionHolder = new SslSessionHolder(csPolicy.getConnectionTimeout());
         if ("https".equals(scheme)) {
@@ -109,8 +128,7 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
 
         final HttpRequest<Buffer> request = webClient
                 .request(method, uri.toString())
-                .connectTimeout(csPolicy.getConnectionTimeout())
-                ;
+                .connectTimeout(determineConnectionTimeout(message, csPolicy));
         message.put(RequestContext.class, sslSessionHolder.createRequestContext(request, uri, csPolicy));
 
     }
@@ -123,7 +141,13 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
                 requestContext);
     }
 
-    static record RequestContext(HttpRequest<Buffer> request, URI uri, HTTPClientPolicy httpClientPolicy, SslSessionHolder sslSessionHolder) {
+    static record RequestContext(HttpRequest<Buffer> request, URI uri, HTTPClientPolicy httpClientPolicy,
+            SslSessionHolder sslSessionHolder) {
+
+        public Buffer createBuffer() {
+            int bufSize = httpClientPolicy.getChunkLength() > 0 ? httpClientPolicy.getChunkLength() : 16320;
+            return Buffer.buffer(bufSize);
+        }
     }
 
     static class SslSessionHolder implements Handler<HttpContext<?>> {
@@ -178,12 +202,12 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
 
     }
 
-    public static class VertxWebClientWrappedOutputStream extends WrappedOutputStream {
+    public class VertxWebClientWrappedOutputStream extends WrappedOutputStream {
 
-        private final RequestContext requestContext;
-        private final Buffer buffer;
+        private RequestContext requestContext;
+        private Buffer buffer;
         private final Lock lock;
-        private final Condition headersReceived;
+        private final Condition bodyReceived;
 
         private HttpResponse<Buffer> response;
         private Throwable exception;
@@ -195,15 +219,10 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
             super(message, possibleRetransmit, isChunking, chunkThreshold, conduitName, requestContext.uri());
             this.requestContext = requestContext;
             this.lock = requestContext.sslSessionHolder.lock; // must be the same lock
-            this.headersReceived = lock.newCondition();
-
-            final HTTPClientPolicy csPolicy = requestContext.httpClientPolicy();
-            int bufSize = csPolicy.getChunkLength() > 0 ? csPolicy.getChunkLength() : 16320;
-            this.buffer = Buffer.buffer(bufSize);
+            this.bodyReceived = lock.newCondition();
+            this.buffer = requestContext.createBuffer();
             this.wrappedStream = new BufferOutputStream(buffer);
         }
-
-
 
         protected HttpResponse<Buffer> getOrAwaitResponse() throws IOException {
             lock.lock();
@@ -211,7 +230,11 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
                 while (response == null) {
                     if (exception == null) {
                         try {
-                            headersReceived.await(requestContext.httpClientPolicy().getReceiveTimeout(), TimeUnit.MILLISECONDS);
+                            bodyReceived.await(
+                                    determineReceiveTimeout(
+                                            outMessage,
+                                            requestContext.httpClientPolicy()),
+                                    TimeUnit.MILLISECONDS);
                         } catch (InterruptedException e) {
                             Thread.currentThread().interrupt();
                             throw new IOException(e);
@@ -237,8 +260,6 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
                 lock.unlock();
             }
         }
-
-
 
         @Override
         protected void setupWrappedStream() throws IOException {
@@ -268,8 +289,6 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
             return clientParameters;
         }
 
-
-
         protected void connect(boolean output) {
             final HttpRequest<Buffer> req = requestContext.request()
             // .idleTimeout(threshold)
@@ -284,7 +303,7 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
                         lock.lock();
                         try {
                             response = r;
-                            headersReceived.signal();
+                            bodyReceived.signal();
                         } finally {
                             lock.unlock();
                         }
@@ -293,7 +312,7 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
                         lock.lock();
                         try {
                             exception = e;
-                            headersReceived.signal();
+                            bodyReceived.signal();
                         } finally {
                             lock.unlock();
                         }
@@ -403,7 +422,6 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
             cookies.readFromHeaders(h);
         }
 
-
         private String readHeaders(Headers h) throws IOException {
             MultiMap responseHeaders = getOrAwaitResponse().headers();
             Set<String> headerNames = responseHeaders.names();
@@ -420,15 +438,13 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
 
         @Override
         protected void handleResponseAsync() throws IOException {
-            // we are always async
+            // TODO: make sure that we are always async
         }
 
         @Override
         protected void closeInputStream() throws IOException {
-            //We just clear the buffer
-            getHttpResponseContent().content().clear();
+            // Vert.x Buffers cannot be closed (Unless they are backed by Netty ByteBufs?)
         }
-
 
         @Override
         protected boolean usingProxy() {
@@ -438,9 +454,99 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
 
         @Override
         protected InputStream getInputStream() throws IOException {
-            getOrAwaitResponse().body()
-            return new ByteBufInputStream(getHttpResponseContent().content());
+            return new BufferInputStream(getOrAwaitResponse().body());
         }
 
+        @Override
+        protected InputStream getPartialResponse() throws IOException {
+            InputStream in = null;
+            final HttpResponse<Buffer> resp = getOrAwaitResponse();
+            int responseCode = resp.statusCode();
+            if (responseCode == HttpURLConnection.HTTP_ACCEPTED
+                    || responseCode == HttpURLConnection.HTTP_OK) {
+
+                final MultiMap headers = resp.headers();
+                String head = headers.get(HttpHeaderHelper.CONTENT_LENGTH);
+                int cli = 0;
+                if (head != null) {
+                    cli = Integer.parseInt(head);
+                }
+                head = headers.get(HttpHeaderHelper.TRANSFER_ENCODING);
+                boolean isChunked = head != null && HttpHeaderHelper.CHUNKED.equalsIgnoreCase(head);
+                head = headers.get(HttpHeaderHelper.CONNECTION);
+                boolean isEofTerminated = head != null && HttpHeaderHelper.CLOSE.equalsIgnoreCase(head);
+                if (cli > 0) {
+                    in = getInputStream();
+                } else if (isChunked || isEofTerminated) {
+                    // ensure chunked or EOF-terminated response is non-empty
+                    try {
+                        PushbackInputStream pin = new PushbackInputStream(getInputStream());
+                        int c = pin.read();
+                        if (c != -1) {
+                            pin.unread((byte) c);
+                            in = pin;
+                        }
+                    } catch (IOException ioe) {
+                        // ignore
+                    }
+                }
+            }
+            return in;
+        }
+
+        @Override
+        protected void setupNewConnection(String newURL) throws IOException {
+            lock.lock();
+            try {
+                response = null;
+                // isAsync = false;
+                exception = null;
+                bodyReceived.signal();
+            } finally {
+                lock.unlock();
+            }
+
+            try {
+                final Address address;
+                if (defaultAddress.getString().equals(newURL)) {
+                    address = defaultAddress;
+                    this.url = defaultAddress.getURI();
+                } else {
+                    this.url = new URI(newURL);
+                    address = new Address(newURL, this.url);
+                }
+                setupConnection(outMessage, address, requestContext.httpClientPolicy());
+                requestContext = outMessage.get(RequestContext.class);
+                // TODO: Once we make sure the buffer cannot be written from the previous request at this point and once
+                // we use a Buffer implementation that allows resetting, we may just reset the buffer instead of
+                // creating a new one.
+                this.buffer = requestContext.createBuffer();
+                this.wrappedStream = new BufferOutputStream(buffer);
+
+            } catch (URISyntaxException e) {
+                throw new IOException(e);
+            }
+        }
+
+        @Override
+        protected void retransmitStream() throws IOException {
+            cachingForRetransmission = false; // already cached
+            setupWrappedStream();
+            cachedStream.writeCacheTo(wrappedStream);
+            wrappedStream.flush();
+            wrappedStream.close();
+        }
+
+        @Override
+        protected void updateCookiesBeforeRetransmit() throws IOException {
+            Headers h = new Headers();
+            readHeaders(h);
+            cookies.readFromHeaders(h);
+        }
+
+        @Override
+        public void thresholdReached() throws IOException {
+            // TODO do we need to force chunked somehow?
+        }
     }
 }

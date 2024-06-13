@@ -54,6 +54,7 @@ import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.annotations.ExecutionTime;
 import io.quarkus.deployment.annotations.Record;
 import io.quarkus.deployment.builditem.CombinedIndexBuildItem;
+import io.quarkus.deployment.builditem.FeatureBuildItem;
 import io.quarkus.deployment.builditem.NativeImageFeatureBuildItem;
 import io.quarkus.deployment.builditem.nativeimage.NativeImageProxyDefinitionBuildItem;
 import io.quarkus.deployment.builditem.nativeimage.ReflectiveClassBuildItem;
@@ -481,9 +482,13 @@ public class CxfClientProcessor {
     void customizers(
             CXFRecorder recorder,
             CxfFixedConfig config,
+            List<FeatureBuildItem> features,
             BuildProducer<RuntimeBusCustomizerBuildItem> customizers) {
         final HTTPConduitImpl factory = config.httpConduitFactory()
-                .orElse(hc5Present() ? HTTPConduitImpl.CXFDefault : HTTPConduitImpl.QuarkusCXFDefault);
+                .orElse(
+                        io.quarkiverse.cxf.deployment.QuarkusCxfFeature.otherCxfClientPresent(features)
+                                ? HTTPConduitImpl.CXFDefault
+                                : HTTPConduitImpl.QuarkusCXFDefault);
         switch (factory) {
             case CXFDefault:
                 // nothing to do
@@ -499,16 +504,6 @@ public class CxfClientProcessor {
             default:
                 throw new IllegalStateException("Unexpected " + HTTPConduitImpl.class.getSimpleName() + " value: "
                         + config.httpConduitFactory());
-        }
-    }
-
-    static boolean hc5Present() {
-        try {
-            Class.forName("io.quarkiverse.cxf.transport.http.hc5.QuarkusWorkQueueImpl");
-            return true;
-        } catch (ClassNotFoundException e) {
-            /* Fine, we can set the chosen ConduitFactory */
-            return false;
         }
     }
 

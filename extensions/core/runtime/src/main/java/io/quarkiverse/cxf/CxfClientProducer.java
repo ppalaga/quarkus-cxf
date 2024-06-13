@@ -176,10 +176,10 @@ public abstract class CxfClientProducer {
 
         final Bus bus = BusFactory.getDefaultBus();
         final HTTPConduitFactory origConduitFactory = bus.getExtension(HTTPConduitFactory.class);
+        System.out.println("==== bus cond factory " + origConduitFactory);
         final QuarkusHTTPConduitFactory conduitFactory = new QuarkusHTTPConduitFactory(
                 fixedConfig,
                 cxfClientInfo,
-                CXFRecorder.isHc5Present(),
                 origConduitFactory,
                 authorizationPolicy);
         props.put(HTTPConduitFactory.class.getName(), conduitFactory);

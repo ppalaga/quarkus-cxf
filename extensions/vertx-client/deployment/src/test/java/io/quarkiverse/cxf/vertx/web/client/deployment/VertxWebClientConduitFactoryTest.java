@@ -1,4 +1,4 @@
-package io.quarkiverse.cxf.transport.http.hc5.deployment;
+package io.quarkiverse.cxf.vertx.web.client.deployment;
 
 import jakarta.inject.Inject;
 import jakarta.jws.WebMethod;
@@ -17,11 +17,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 import io.quarkiverse.cxf.annotation.CXFClient;
-import io.quarkiverse.cxf.vertx.web.client.AsyncHTTPConduit;
-import io.quarkiverse.cxf.vertx.web.client.AsyncHTTPConduitFactory;
+import io.quarkiverse.cxf.vertx.web.client.VertxWebClientHTTPConduit;
+import io.quarkiverse.cxf.vertx.web.client.VertxWebClientHTTPConduitFactory;
 import io.quarkus.test.QuarkusUnitTest;
 
-public class Hc5ConduitFactoryTest {
+public class VertxWebClientConduitFactoryTest {
 
     @RegisterExtension
     public static final QuarkusUnitTest test = new QuarkusUnitTest()
@@ -42,10 +42,10 @@ public class Hc5ConduitFactoryTest {
     void conduitFactory() {
         final Bus bus = BusFactory.getDefaultBus();
         final HTTPConduitFactory factory = bus.getExtension(HTTPConduitFactory.class);
-        Assertions.assertThat(factory).isInstanceOf(AsyncHTTPConduitFactory.class);
+        Assertions.assertThat(factory).isInstanceOf(VertxWebClientHTTPConduitFactory.class);
 
         final Client client = ClientProxy.getClient(helloService);
-        Assertions.assertThat(client.getConduit()).isInstanceOf(AsyncHTTPConduit.class);
+        Assertions.assertThat(client.getConduit()).isInstanceOf(VertxWebClientHTTPConduit.class);
 
         /* ... and make sure that the alternative conduit works */
         Assertions.assertThat(helloService.hello("Joe")).isEqualTo("Hello Joe");
@@ -59,7 +59,7 @@ public class Hc5ConduitFactoryTest {
 
     }
 
-    @WebService(endpointInterface = "io.quarkiverse.cxf.transport.http.hc5.deployment.Hc5ConduitFactoryTest$HelloService", serviceName = "HelloService")
+    @WebService(serviceName = "HelloService")
     public static class SlowHelloServiceImpl implements HelloService {
 
         @Override

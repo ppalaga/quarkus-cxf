@@ -3,6 +3,7 @@ package io.quarkiverse.cxf.transport.http.hc5.deployment;
 import java.util.Arrays;
 import java.util.List;
 
+import io.quarkiverse.cxf.deployment.QuarkusCxfFeature;
 import io.quarkiverse.cxf.deployment.RuntimeBusCustomizerBuildItem;
 import io.quarkiverse.cxf.transport.http.hc5.Hc5Recorder;
 import io.quarkus.deployment.annotations.BuildProducer;
@@ -16,7 +17,7 @@ public class QuarkusCxfTransportsHTTPAsyncProcessor {
 
     @BuildStep
     FeatureBuildItem feature() {
-        return new FeatureBuildItem("cxf-rt-transports-http-hc5");
+        return QuarkusCxfFeature.CXF_RT_TRANSPORTS_HTTP_HC5.asFeature();
     }
 
     @BuildStep
