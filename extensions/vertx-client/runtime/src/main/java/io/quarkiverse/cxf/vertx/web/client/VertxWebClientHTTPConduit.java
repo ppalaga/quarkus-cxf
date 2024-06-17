@@ -29,6 +29,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.Principal;
 import java.security.cert.Certificate;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,8 +38,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.logging.Level;
 
 import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
 
 import org.apache.cxf.Bus;
@@ -45,12 +49,15 @@ import org.apache.cxf.common.util.PropertyUtils;
 import org.apache.cxf.configuration.jsse.TLSClientParameters;
 import org.apache.cxf.helpers.HttpHeaderHelper;
 import org.apache.cxf.io.CacheAndWriteOutputStream;
+import org.apache.cxf.io.CachedOutputStream;
 import org.apache.cxf.message.Message;
 import org.apache.cxf.message.MessageUtils;
 import org.apache.cxf.service.model.EndpointInfo;
 import org.apache.cxf.transport.http.Address;
 import org.apache.cxf.transport.http.HTTPConduit;
 import org.apache.cxf.transport.http.Headers;
+import org.apache.cxf.transport.http.MessageTrustDecider;
+import org.apache.cxf.transport.http.UntrustedURLConnectionIOException;
 import org.apache.cxf.transport.https.HttpsURLConnectionInfo;
 import org.apache.cxf.transports.http.configuration.HTTPClientPolicy;
 import org.apache.cxf.version.Version;
@@ -96,7 +103,8 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
         if (clientParameters == null) {
             clientParameters = tlsClientParameters;
         }
-        if ("https".equals(uri.getScheme())
+        boolean isHttps = "https".equals(uri.getScheme());
+        if (isHttps
                 && clientParameters != null
                 && clientParameters.getSSLSocketFactory() != null) {
             throw new IllegalStateException("Cannot use SSLSocketFactory set via TLSClientParameters");
@@ -123,7 +131,28 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
 
         final WebClientInternal webClient = (WebClientInternal) WebClient.wrap(httpClient, opts);
 
-        final SslSessionHolder sslSessionHolder = new SslSessionHolder(csPolicy.getConnectionTimeout());
+        final List<MessageTrustDecider> trustDeciders;
+        MessageTrustDecider decider2;
+        if (isHttps
+                && ((decider2 = message.get(MessageTrustDecider.class)) != null
+                        || this.trustDecider != null)) {
+            trustDeciders = new ArrayList<>(2);
+            if (this.trustDecider != null) {
+                trustDeciders.add(this.trustDecider);
+            }
+            if (decider2 != null) {
+                trustDeciders.add(decider2);
+            }
+        } else {
+            trustDeciders = Collections.emptyList();
+        }
+        final HostnameVerifier verifier = org.apache.cxf.transport.https.SSLUtils
+                .getHostnameVerifier(findTLSClientParameters(message));
+        final TrustHandler sslSessionHolder = new TrustHandler(
+                message,
+                uri,
+                getConduitName(),
+                csPolicy.getConnectionTimeout(), trustDeciders, verifier);
         if ("https".equals(scheme)) {
             webClient.addInterceptor(sslSessionHolder);
         }
@@ -135,7 +164,7 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
         final HttpRequest<Buffer> request = webClient
                 .request(method, uri.getPort(), uri.getHost(), pathAndQuery);
         request.connectTimeout(determineConnectionTimeout(message, csPolicy));
-        message.put(RequestContext.class, sslSessionHolder.createRequestContext(request, uri, csPolicy));
+        message.put(RequestContext.class, sslSessionHolder.createRequestContext(request, csPolicy));
 
     }
 
@@ -147,8 +176,19 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
                 requestContext);
     }
 
+    TLSClientParameters findTLSClientParameters(Message message) {
+        TLSClientParameters clientParameters = message.get(TLSClientParameters.class);
+        if (clientParameters == null) {
+            clientParameters = getTlsClientParameters();
+        }
+        if (clientParameters == null) {
+            clientParameters = new TLSClientParameters();
+        }
+        return clientParameters;
+    }
+
     static record RequestContext(HttpRequest<Buffer> request, URI uri, HTTPClientPolicy httpClientPolicy,
-            SslSessionHolder sslSessionHolder) {
+            TrustHandler sslSessionHolder) {
 
         public Buffer createBuffer() {
             int bufSize = httpClientPolicy.getChunkLength() > 0 ? httpClientPolicy.getChunkLength() : 16320;
@@ -156,55 +196,121 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
         }
     }
 
-    static class SslSessionHolder implements Handler<HttpContext<?>> {
+    static class TrustHandler implements Handler<HttpContext<?>> {
 
+        private final Message message;
+        private final String conduitName;
+        private final List<MessageTrustDecider> trustDeciders;
+        private final HostnameVerifier verifier;
         private final long connectTimeout;
         private final Lock lock = new ReentrantLock();
-        private final Condition connected = lock.newCondition();
-        private SSLSession sslSession;
+        private final URI url;
 
-        public SSLSession getOrAwaitSslSession() throws IOException {
-            lock.lock();
-            try {
-                if (sslSession == null) {
-                    try {
-                        connected.await(connectTimeout, TimeUnit.MILLISECONDS);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        throw new IOException(e);
-                    }
-                    if (sslSession == null) {
-                        throw new SocketTimeoutException("Timeout waiting for SSL Session");
-                    }
-                }
-                return sslSession;
-            } finally {
-                lock.unlock();
-            }
-        }
-
-        public RequestContext createRequestContext(HttpRequest<Buffer> request, URI uri, HTTPClientPolicy csPolicy) {
-            System.out.println("==== creating RequestContext with req " + request);
-            return new RequestContext(request, uri, csPolicy, this);
-        }
-
-        public SslSessionHolder(long connectTimeout) {
+        public TrustHandler(
+                Message message,
+                URI url,
+                String conduitName,
+                long connectTimeout, List<MessageTrustDecider> trustDeciders, HostnameVerifier verifier) {
             super();
+            this.message = message;
+            this.url = url;
+            this.conduitName = conduitName;
+            this.trustDeciders = trustDeciders;
             this.connectTimeout = connectTimeout;
+            this.verifier = verifier;
+        }
+        //
+        //        public SSLSession getOrAwaitSslSession() throws IOException {
+        //            lock.lock();
+        //            try {
+        //                if (sslSession == null) {
+        //                    try {
+        //                        connected.await(connectTimeout, TimeUnit.MILLISECONDS);
+        //                    } catch (InterruptedException e) {
+        //                        Thread.currentThread().interrupt();
+        //                        throw new IOException(e);
+        //                    }
+        //                    if (sslSession == null) {
+        //                        throw new SocketTimeoutException("Timeout waiting for SSL Session");
+        //                    }
+        //                }
+        //                return sslSession;
+        //            } finally {
+        //                lock.unlock();
+        //            }
+        //        }
+
+        public RequestContext createRequestContext(HttpRequest<Buffer> request, HTTPClientPolicy csPolicy) {
+            System.out.println("==== creating RequestContext with req " + request);
+            return new RequestContext(request, url, csPolicy, this);
         }
 
         @Override
         public void handle(HttpContext<?> ctx) {
             if (ctx.phase() == ClientPhase.RECEIVE_RESPONSE) {
                 final SSLSession sslSession = ctx.clientResponse().netSocket().sslSession();
-                lock.lock();
-                try {
-                    this.sslSession = sslSession;
-                    connected.signal();
-                } finally {
-                    lock.unlock();
+                if (!verifier.verify(url.getHost(), sslSession)) {
+                    throw new RuntimeException("Could not verify host " + url.getHost());
                 }
+                if (!trustDeciders.isEmpty()) {
+                    HttpsURLConnectionInfo info;
+                    try {
+                        info = getHttpsURLConnectionInfo(url, ctx.clientRequest().getMethod().name(), sslSession);
+                    } catch (SSLPeerUnverifiedException e) {
+                        throw new RuntimeException(e);
+                    }
+                    for (MessageTrustDecider trustDecider : trustDeciders) {
+                        try {
+                            trustDecider.establishTrust(conduitName, info, message);
+                            if (LOG.isLoggable(Level.FINE)) {
+                                LOG.log(Level.FINE, "Trust Decider "
+                                        + trustDecider.getLogicalName()
+                                        + " considers Conduit "
+                                        + conduitName
+                                        + " trusted.");
+                            }
+                        } catch (UntrustedURLConnectionIOException untrustedEx) {
+                            if (LOG.isLoggable(Level.FINE)) {
+                                LOG.log(Level.FINE, "Trust Decider "
+                                        + trustDecider.getLogicalName()
+                                        + " considers Conduit "
+                                        + conduitName
+                                        + " untrusted.", untrustedEx);
+                            }
+                            throw new RuntimeException(untrustedEx);
+                        }
+
+                    }
+                } else {
+                    // This case, when there is no trust decider, a trust
+                    // decision should be a matter of policy.
+                    if (LOG.isLoggable(Level.FINE)) {
+                        LOG.log(Level.FINE, "No Trust Decider for Conduit '"
+                                + conduitName
+                                + "'. An affirmative Trust Decision is assumed.");
+                    }
+                }
+
             }
+        }
+
+        HttpsURLConnectionInfo getHttpsURLConnectionInfo(URI url, String method, SSLSession session)
+                throws SSLPeerUnverifiedException {
+
+            String cipherSuite = null;
+            Certificate[] localCerts = null;
+            Principal principal = null;
+            Certificate[] serverCerts = null;
+            Principal peer = null;
+            if (session != null) {
+                cipherSuite = session.getCipherSuite();
+                localCerts = session.getLocalCertificates();
+                principal = session.getLocalPrincipal();
+                serverCerts = session.getPeerCertificates();
+                peer = session.getPeerPrincipal();
+            }
+
+            return new HttpsURLConnectionInfo(url, method, cipherSuite, localCerts, principal, serverCerts, peer);
         }
 
     }
@@ -218,11 +324,12 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
 
         private HttpResponse<Buffer> response;
         private Throwable exception;
+        private boolean closed;
 
         @SuppressWarnings("unchecked")
         protected VertxWebClientWrappedOutputStream(Message message, boolean possibleRetransmit,
                 boolean isChunking, int chunkThreshold, String conduitName, RequestContext requestContext) {
-            super(message, possibleRetransmit, isChunking, chunkThreshold, conduitName, requestContext.uri());
+            super(message, possibleRetransmit, isChunking, 0, conduitName, requestContext.uri());
             this.requestContext = requestContext;
             this.lock = requestContext.sslSessionHolder.lock; // must be the same lock
             this.bodyReceived = lock.newCondition();
@@ -269,7 +376,7 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
 
         @Override
         protected void setupWrappedStream() throws IOException {
-            connect(true);
+            //connect(true);
 
             // If we need to cache for retransmission, store data in a
             // CacheAndWriteOutputStream. Otherwise write directly to the output stream.
@@ -281,27 +388,22 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
 
         @Override
         protected void handleNoOutput() throws IOException {
-            connect(false);
+            //connect(false);
         }
 
-        protected TLSClientParameters findTLSClientParameters() {
-            TLSClientParameters clientParameters = outMessage.get(TLSClientParameters.class);
-            if (clientParameters == null) {
-                clientParameters = getTlsClientParameters();
-            }
-            if (clientParameters == null) {
-                clientParameters = new TLSClientParameters();
-            }
-            return clientParameters;
-        }
+        void connect() {
+            final String method = getMethod();
+            final boolean hasBody = !KNOWN_HTTP_VERBS_WITH_NO_CONTENT.contains(method)
+                    && !PropertyUtils.isTrue(outMessage.get(Headers.EMPTY_REQUEST_PROPERTY));
 
-        protected void connect(boolean output) {
             final HttpRequest<Buffer> req = requestContext.request()
             // .idleTimeout(threshold)
             ;
 
-            log.warn("=== sending buffer " + buffer.length());
-            final Future<HttpResponse<Buffer>> sendBufferState = output
+            log.warn("=== sending buffer " + buffer.length(),
+                    new RuntimeException());
+            
+            final Future<HttpResponse<Buffer>> sendBufferState = hasBody
                     ? req.sendBuffer(buffer)
                     : req.send();
 
@@ -328,34 +430,12 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
 
         @Override
         protected HttpsURLConnectionInfo getHttpsURLConnectionInfo() throws IOException {
-            if ("http".equals(outMessage.get("http.scheme"))) {
-                return null;
-            }
-            connect(true);
+            throw new UnsupportedOperationException();
+        }
 
-            HostnameVerifier verifier = org.apache.cxf.transport.https.SSLUtils
-                    .getHostnameVerifier(findTLSClientParameters());
-
-            final SSLSession session = requestContext.sslSessionHolder.getOrAwaitSslSession();
-            if (!verifier.verify(url.getHost(), session)) {
-                throw new IOException("Could not verify host " + url.getHost());
-            }
-
-            String method = (String) outMessage.get(Message.HTTP_REQUEST_METHOD);
-            String cipherSuite = null;
-            Certificate[] localCerts = null;
-            Principal principal = null;
-            Certificate[] serverCerts = null;
-            Principal peer = null;
-            if (session != null) {
-                cipherSuite = session.getCipherSuite();
-                localCerts = session.getLocalCertificates();
-                principal = session.getLocalPrincipal();
-                serverCerts = session.getPeerCertificates();
-                peer = session.getPeerPrincipal();
-            }
-
-            return new HttpsURLConnectionInfo(url, method, cipherSuite, localCerts, principal, serverCerts, peer);
+        @Override
+        protected void makeTrustDecision() throws IOException {
+            /* We check the trust in our TrustHandler above */
         }
 
         @Override
@@ -556,5 +636,30 @@ public class VertxWebClientHTTPConduit extends HTTPConduit {
         public void thresholdReached() throws IOException {
             // TODO do we need to force chunked somehow?
         }
+
+        @Override
+        public void thresholdNotReached() {
+            super.thresholdNotReached();
+            connect();
+        }
+
+        @Override
+        public void close() throws IOException {
+            if (closed) {
+                return;
+            }
+            closed = true;
+            if (!chunking && wrappedStream instanceof CachedOutputStream) {
+                CachedOutputStream out = (CachedOutputStream) wrappedStream;
+                HttpRequest<Buffer> request = requestContext.request();
+                request.headers().set("Content-Length", String.valueOf(out.size()));
+                wrappedStream = null;
+                handleHeadersTrustCaching();
+                out.writeCacheTo(wrappedStream);
+
+            }
+            super.close();
+        }
+
     }
 }

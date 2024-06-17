@@ -22,7 +22,7 @@ public class BufferOutputStream extends OutputStream {
 
     @Override
     public void write(byte[] b, int off, int len) throws IOException {
-        log.warn("=== writing " + new String(b));
+        log.warn("=== writing " + new String(b), new RuntimeException());
         buffer.appendBytes(b, off, len);
     }
 
