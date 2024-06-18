@@ -4,7 +4,9 @@ import java.util.List;
 
 import io.quarkiverse.cxf.deployment.QuarkusCxfFeature;
 import io.quarkiverse.cxf.deployment.RuntimeBusCustomizerBuildItem;
+import io.quarkiverse.cxf.vertx.web.client.HttpClientPool;
 import io.quarkiverse.cxf.vertx.web.client.VertxWebClientRecorder;
+import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
 import io.quarkus.deployment.annotations.BuildProducer;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.annotations.ExecutionTime;
@@ -36,6 +38,11 @@ public class VertxWebClientProcessor {
             VertxWebClientRecorder recorder,
             BuildProducer<RuntimeBusCustomizerBuildItem> customizers) {
         customizers.produce(new RuntimeBusCustomizerBuildItem(recorder.customizeBus()));
+    }
+
+    @BuildStep
+    void additionalBeans(BuildProducer<AdditionalBeanBuildItem> additionalBeans) {
+        additionalBeans.produce(AdditionalBeanBuildItem.unremovableOf(HttpClientPool.class));
     }
 
 }

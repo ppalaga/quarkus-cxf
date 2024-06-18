@@ -31,8 +31,6 @@ import org.apache.cxf.ws.addressing.EndpointReferenceType;
 
 import io.quarkus.arc.Arc;
 import io.quarkus.arc.InstanceHandle;
-import io.vertx.core.Vertx;
-import io.vertx.core.http.HttpClient;
 
 /**
  *
@@ -40,21 +38,21 @@ import io.vertx.core.http.HttpClient;
 @NoJSR250Annotations
 public class VertxWebClientHTTPConduitFactory implements HTTPConduitFactory {
 
-    private final HttpClient httpClient;
+    private final HttpClientPool httpClientPool;
 
     VertxWebClientHTTPConduitFactory() {
         super();
-        InstanceHandle<Vertx> vertx = Arc.container().instance(Vertx.class);
+        InstanceHandle<HttpClientPool> vertx = Arc.container().instance(HttpClientPool.class);
         if (!vertx.isAvailable()) {
-            throw new IllegalStateException(Vertx.class.getName() + " not available in Arc");
+            throw new IllegalStateException(HttpClientPool.class.getName() + " not available in Arc");
         }
-        this.httpClient = vertx.get().createHttpClient();
+        this.httpClientPool = vertx.get();
     }
 
     @Override
     public HTTPConduit createConduit(HTTPTransportFactory f, Bus b, EndpointInfo localInfo, EndpointReferenceType target)
             throws IOException {
-        return new VertxWebClientHTTPConduit(b, localInfo, httpClient);
+        return new VertxWebClientHTTPConduit(b, localInfo, httpClientPool);
     }
 
 }
