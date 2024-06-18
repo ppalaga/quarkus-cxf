@@ -12,7 +12,9 @@ import org.assertj.core.api.Assertions;
 import org.assertj.core.api.ThrowingConsumer;
 import org.junit.jupiter.api.Test;
 
-import io.quarkiverse.cxf.vertx.web.client.RequestBodyEvent.RequestBodyEventType;
+import io.quarkiverse.cxf.vertx.web.client.VertxWebClientHTTPConduit.RequestBodyEvent;
+import io.quarkiverse.cxf.vertx.web.client.VertxWebClientHTTPConduit.RequestBodyEvent.RequestBodyEventType;
+import io.quarkiverse.cxf.vertx.web.client.VertxWebClientHTTPConduit.RequestBodyOutputStream;
 import io.vertx.core.buffer.Buffer;
 
 public class RequestBodyOutputStreamTest {
