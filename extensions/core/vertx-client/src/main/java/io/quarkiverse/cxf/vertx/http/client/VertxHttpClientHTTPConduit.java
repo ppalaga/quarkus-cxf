@@ -40,7 +40,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
@@ -69,6 +68,8 @@ import org.apache.cxf.ws.addressing.EndpointReferenceType;
 
 import io.quarkiverse.cxf.vertx.http.client.HttpClientPool.ClientSpec;
 import io.quarkiverse.cxf.vertx.http.client.VertxHttpClientHTTPConduit.RequestBodyEvent.RequestBodyEventType;
+import io.vertx.core.Context;
+import io.vertx.core.Handler;
 import io.vertx.core.MultiMap;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpClient;
@@ -354,9 +355,12 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
         private Result<HttpClientRequest> request;
 
         private Result<ResponseEvent> response;
-        private final Lock lock = new ReentrantLock();
+        private final ReentrantLock lock = new ReentrantLock();
         private final Condition requestReady = lock.newCondition();
+        private final Condition requestWriteable = lock.newCondition();
         private final Condition responseReceived = lock.newCondition();
+        private boolean drainHandlerRegistered;
+        private boolean waitingForDrain;
 
         public RequestBodyHandler(
                 Message outMessage,
@@ -381,6 +385,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
         @Override
         public void handle(RequestBodyEvent event) throws IOException {
             if (firstEvent) {
+                firstEvent = false;
                 final HttpClient client = clientPool.getClient(clientSpec);
 
                 switch (event.eventType()) {
@@ -406,7 +411,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                                     req
                                             .setChunked(true)
                                             .write(event.buffer())
-                                            .onFailure(RequestBodyHandler.this::fail);
+                                            .onFailure(RequestBodyHandler.this::failResponse);
 
                                     lock.lock();
                                     try {
@@ -458,7 +463,6 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
 
                 }
 
-                firstEvent = false;
             } else {
                 /* Non-first event */
                 final HttpClientRequest req = awaitRequest();
@@ -466,7 +470,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                     case NON_FINAL_CHUNK: {
                         req
                                 .write(event.buffer())
-                                .onFailure(RequestBodyHandler.this::fail);
+                                .onFailure(RequestBodyHandler.this::failResponse);
                         break;
                     }
                     case FINAL_CHUNK:
@@ -490,7 +494,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                         pipedOutputStream);
                 req
                         .end(buffer)
-                        .onFailure(RequestBodyHandler.this::fail);
+                        .onFailure(RequestBodyHandler.this::failResponse);
 
                 req.response()
                         .onComplete(ar -> {
@@ -516,7 +520,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
             }
         }
 
-        void fail(Throwable t) {
+        void failResponse(Throwable t) {
             lock.lock();
             try {
                 response = Result.failure(t);
@@ -614,6 +618,9 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                             throw new SocketTimeoutException("Timeout waiting for HTTP connect to " + url);
                         }
                     }
+                    if (request.succeeded()) {
+                        awaitWriteable(request.result());
+                    }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     throw new IOException("Interrupted waiting for HTTP response from " + url, e);
@@ -658,6 +665,41 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                         : new IOException(e);
                 pipedInputStream.setException(ioe);
             });
+        }
+
+        private void awaitWriteable(HttpClientRequest request) throws IOException, InterruptedException {
+            assert lock.isHeldByCurrentThread();
+            while (request.writeQueueFull()) {
+                if (this.request.cause() != null) {
+                    throw new IOException(this.request.cause());
+                }
+                if (Context.isOnEventLoopThread()) {
+                    throw new IllegalStateException("Attempting a blocking write on io thread");
+                }
+                if (!drainHandlerRegistered) {
+                    drainHandlerRegistered = true;
+                    final Handler<Void> drainHandler = new Handler<Void>() {
+                        @Override
+                        public void handle(Void event) {
+                            if (waitingForDrain) {
+                                lock.lock();
+                                try {
+                                    requestWriteable.signal();
+                                } finally {
+                                    lock.unlock();
+                                }
+                            }
+                        }
+                    };
+                    request.drainHandler(drainHandler);
+                }
+                try {
+                    waitingForDrain = true;
+                    requestWriteable.await(receiveTimeoutMs, TimeUnit.MILLISECONDS);
+                } finally {
+                    waitingForDrain = false;
+                }
+            }
         }
     }
 
