@@ -69,7 +69,6 @@ import org.apache.cxf.ws.addressing.EndpointReferenceType;
 
 import io.quarkiverse.cxf.vertx.http.client.HttpClientPool.ClientSpec;
 import io.quarkiverse.cxf.vertx.http.client.VertxHttpClientHTTPConduit.RequestBodyEvent.RequestBodyEventType;
-import io.vertx.core.Future;
 import io.vertx.core.MultiMap;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpClient;
@@ -349,10 +348,14 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
         private final long receiveTimeoutMs;
         private final IOEHandler<ResponseEvent> responseHandler;
 
-        private Future<HttpClientRequest> requestState;
+        /** Read an written only from the producer thread */
+        private boolean firstEvent = true;
+        /** Read from the producer thread, written from the event loop */
+        private Result<HttpClientRequest> request;
 
-        private Result<HttpClientResponse> response;
+        private Result<ResponseEvent> response;
         private final Lock lock = new ReentrantLock();
+        private final Condition requestReady = lock.newCondition();
         private final Condition responseReceived = lock.newCondition();
 
         public RequestBodyHandler(
@@ -377,8 +380,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
 
         @Override
         public void handle(RequestBodyEvent event) throws IOException {
-            final boolean firstChunk;
-            if (requestState == null) {
+            if (firstEvent) {
                 final HttpClient client = clientPool.getClient(clientSpec);
 
                 switch (event.eventType()) {
@@ -397,72 +399,120 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
 
                 setProtocolHeaders(outMessage, requestOptions, userAgent);
 
-                this.requestState = client.request(requestOptions);
+                client.request(requestOptions)
+                        .onSuccess(req -> {
+                            switch (event.eventType()) {
+                                case NON_FINAL_CHUNK: {
+                                    req
+                                            .setChunked(true)
+                                            .write(event.buffer())
+                                            .onFailure(RequestBodyHandler.this::fail);
 
-                firstChunk = true;
+                                    lock.lock();
+                                    try {
+                                        this.request = new Result<>(req, null);
+                                        requestReady.signal();
+                                    } finally {
+                                        lock.unlock();
+                                    }
+
+                                    break;
+                                }
+                                case FINAL_CHUNK:
+                                case COMPLETE_BODY: {
+                                    finishRequest(req, event.buffer());
+                                    break;
+                                }
+                                default:
+                                    throw new IllegalArgumentException(
+                                            "Unexpected " + RequestBodyEventType.class.getName() + ": " + event.eventType());
+
+                            }
+                        })
+                        .onFailure(t -> {
+                            lock.lock();
+                            try {
+                                request = Result.failure(t);
+                                requestReady.signal();
+
+                                /* Fail also the response so that awaitResponse() fails rather than waiting forever */
+                                response = Result.failure(t);
+                                responseReceived.signal();
+                            } finally {
+                                lock.unlock();
+                            }
+                        });
+
+                switch (event.eventType()) {
+                    case NON_FINAL_CHUNK:
+                        /* Nothing to do */
+                        break;
+                    case FINAL_CHUNK:
+                    case COMPLETE_BODY: {
+                        responseHandler.handle(awaitResponse());
+                        break;
+                    }
+                    default:
+                        throw new IllegalArgumentException(
+                                "Unexpected " + RequestBodyEventType.class.getName() + ": " + event.eventType());
+
+                }
+
+                firstEvent = false;
             } else {
-                firstChunk = false;
-            }
-
-            switch (event.eventType()) {
-                case NON_FINAL_CHUNK: {
-                    this.requestState = this.requestState.compose(req -> {
-                        if (firstChunk) {
-                            req.setChunked(true);
-                        }
-
+                /* Non-first event */
+                final HttpClientRequest req = awaitRequest();
+                switch (event.eventType()) {
+                    case NON_FINAL_CHUNK: {
                         req
                                 .write(event.buffer())
                                 .onFailure(RequestBodyHandler.this::fail);
-
-                        return Future.succeededFuture(req);
-                    });
-                    break;
-                }
-                case FINAL_CHUNK:
-                case COMPLETE_BODY: {
-                    try {
-                        final PipedOutputStream pipedOutputStream = new PipedOutputStream();
-                        final ExceptionAwarePipedInputStream pipedInputStream = new ExceptionAwarePipedInputStream(
-                                pipedOutputStream);
-                        this.requestState = this.requestState.compose(req -> {
-                            req
-                                    .end(event.buffer())
-                                    .onFailure(RequestBodyHandler.this::fail);
-
-                            req.response()
-                                    .onComplete(ar -> {
-                                        if (ar.succeeded()) {
-                                            pipe(ar.result(), pipedOutputStream, pipedInputStream);
-                                        } else {
-                                            if (ar.cause() instanceof IOException) {
-                                                pipedInputStream.setException((IOException) ar.cause());
-                                            } else {
-                                                pipedInputStream.setException(new IOException(ar.cause()));
-                                            }
-                                        }
-                                        lock.lock();
-                                        try {
-                                            response = new Result<HttpClientResponse>(ar.result(), ar.cause());
-                                            responseReceived.signal();
-                                        } finally {
-                                            lock.unlock();
-                                        }
-                                    });
-                            return Future.succeededFuture(req);
-                        })
-                                .onFailure(RequestBodyHandler.this::fail);
-
-                        responseHandler.handle(new ResponseEvent(awaitResponse(), pipedInputStream));
-                    } catch (IOException e) {
-                        throw new VertxHttpException(e);
+                        break;
                     }
+                    case FINAL_CHUNK:
+                    case COMPLETE_BODY: {
+                        finishRequest(req, event.buffer());
+                        responseHandler.handle(awaitResponse());
+                        break;
+                    }
+                    default:
+                        throw new IllegalArgumentException(
+                                "Unexpected " + RequestBodyEventType.class.getName() + ": " + event.eventType());
 
-                    break;
                 }
-                default:
-                    throw new IllegalArgumentException(
-                            "Unexpected " + RequestBodyEventType.class.getName() + ": " + event.eventType());
+            }
+        }
+
+        void finishRequest(HttpClientRequest req, Buffer buffer) {
+            try {
+                final PipedOutputStream pipedOutputStream = new PipedOutputStream();
+                final ExceptionAwarePipedInputStream pipedInputStream = new ExceptionAwarePipedInputStream(
+                        pipedOutputStream);
+                req
+                        .end(buffer)
+                        .onFailure(RequestBodyHandler.this::fail);
+
+                req.response()
+                        .onComplete(ar -> {
+                            if (ar.succeeded()) {
+                                pipe(ar.result(), pipedOutputStream, pipedInputStream);
+                            } else {
+                                if (ar.cause() instanceof IOException) {
+                                    pipedInputStream.setException((IOException) ar.cause());
+                                } else {
+                                    pipedInputStream.setException(new IOException(ar.cause()));
+                                }
+                            }
+                            lock.lock();
+                            try {
+                                response = new Result<>(new ResponseEvent(ar.result(), pipedInputStream), ar.cause());
+                                responseReceived.signal();
+                            } finally {
+                                lock.unlock();
+                            }
+                        });
+            } catch (IOException e) {
+                throw new VertxHttpException(e);
             }
         }
 
@@ -529,7 +579,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
             }
         }
 
-        HttpClientResponse awaitResponse() throws IOException {
+        ResponseEvent awaitResponse() throws IOException {
             /* This should be called from the same worker thread as handle() */
             if (response == null) {
                 lock.lock();
@@ -551,6 +601,31 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
             } else {
                 final Throwable e = response.cause();
                 throw new IOException("Unable to receive HTTP response from " + url, e);
+            }
+        }
+
+        HttpClientRequest awaitRequest() throws IOException {
+            /* This should be called from the same worker thread as handle() */
+            if (request == null) {
+                lock.lock();
+                try {
+                    if (request == null) {
+                        if (!requestReady.await(requestOptions.getConnectTimeout(), TimeUnit.MILLISECONDS) || request == null) {
+                            throw new SocketTimeoutException("Timeout waiting for HTTP connect to " + url);
+                        }
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted waiting for HTTP response from " + url, e);
+                } finally {
+                    lock.unlock();
+                }
+            }
+            if (request.succeeded()) {
+                return request.result();
+            } else {
+                final Throwable e = request.cause();
+                throw new IOException("Unable to connect to " + url, e);
             }
         }
 
