@@ -71,6 +71,7 @@
                 </property>
             </activation>
             <properties>
+                <keystore.type.short>p12</keystore.type.short>
                 <keystore.type>pkcs12</keystore.type>
             </properties>
             <build>
@@ -131,6 +132,7 @@
                 </property>
             </activation>
             <properties>
+                <keystore.type.short>jks</keystore.type.short>
                 <keystore.type>jks</keystore.type>
             </properties>
             <build>
