@@ -207,7 +207,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                 cookies,
                 incomingObserver);
 
-        final IOEHandler<RequestBodyEvent> requestBodyHandler = new RequestBodyHandler(
+        final IOEHandler<RequestBodyEvent> requestBodyHandler = new SyncRequestBodyHandler(
                 message,
                 requestContext.uri,
                 userAgent,
@@ -371,7 +371,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
         }
     }
 
-    static class RequestBodyHandler implements IOEHandler<RequestBodyEvent> {
+    static class SyncRequestBodyHandler implements IOEHandler<RequestBodyEvent> {
         private final Message outMessage;
         private final URI url;
         private final String userAgent;
@@ -405,7 +405,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
         private boolean drainHandlerRegistered;
         private boolean waitingForDrain;
 
-        public RequestBodyHandler(
+        public SyncRequestBodyHandler(
                 Message outMessage,
                 URI url,
                 String userAgent,
@@ -454,7 +454,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                                     req
                                             .setChunked(true)
                                             .write(event.buffer())
-                                            .onFailure(RequestBodyHandler.this::failResponse);
+                                            .onFailure(SyncRequestBodyHandler.this::failResponse);
 
                                     lock.lock();
                                     try {
@@ -513,7 +513,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                     case NON_FINAL_CHUNK: {
                         req
                                 .write(event.buffer())
-                                .onFailure(RequestBodyHandler.this::failResponse);
+                                .onFailure(SyncRequestBodyHandler.this::failResponse);
                         break;
                     }
                     case FINAL_CHUNK:
@@ -559,7 +559,401 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
 
                 req
                         .end(buffer)
-                        .onFailure(RequestBodyHandler.this::failResponse);
+                        .onFailure(SyncRequestBodyHandler.this::failResponse);
+
+            } catch (IOException e) {
+                throw new VertxHttpException(e);
+            }
+        }
+
+        void failResponse(Throwable t) {
+            lock.lock();
+            try {
+                response = Result.failure(t);
+                responseReceived.signal();
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        static void setProtocolHeaders(Message outMessage, RequestOptions requestOptions, String userAgent) throws IOException {
+            final Object contentType = outMessage.get(Message.CONTENT_TYPE);
+            final MultiMap outHeaders;
+            if (contentType instanceof String) {
+                requestOptions.putHeader(HttpHeaderHelper.CONTENT_TYPE, (String) contentType);
+                outHeaders = requestOptions.getHeaders();
+            } else {
+                outHeaders = HttpHeaders.headers();
+                requestOptions.setHeaders(outHeaders);
+            }
+
+            Headers h = new Headers(outMessage);
+            boolean addHeaders = MessageUtils.getContextualBoolean(outMessage, Headers.ADD_HEADERS_PROPERTY, false);
+
+            for (Map.Entry<String, List<String>> header : h.headerMap().entrySet()) {
+                if (HttpHeaderHelper.CONTENT_TYPE.equalsIgnoreCase(header.getKey())) {
+                    continue;
+                }
+                if (addHeaders || HttpHeaderHelper.COOKIE.equalsIgnoreCase(header.getKey())) {
+                    List<String> values = header.getValue();
+                    for (String s : values) {
+                        outHeaders.add(HttpHeaderHelper.COOKIE, s);
+                    }
+                } else if (!"Content-Length".equalsIgnoreCase(header.getKey())) {
+                    final List<String> values = header.getValue();
+                    final int len = values.size();
+                    switch (len) {
+                        case 0: {
+                            outHeaders.set(header.getKey(), "");
+                            break;
+                        }
+                        case 1: {
+                            outHeaders.set(header.getKey(), values.get(0));
+                            break;
+                        }
+                        default:
+                            final StringBuilder b = new StringBuilder();
+                            for (int i = 0; i < len; i++) {
+                                b.append(values.get(i));
+                                if (i + 1 < len) {
+                                    b.append(',');
+                                }
+                            }
+                            outHeaders.set(header.getKey(), b.toString());
+                            break;
+                    }
+                }
+                if (!outHeaders.contains("User-Agent")) {
+                    outHeaders.set("User-Agent", userAgent);
+                }
+            }
+        }
+
+        ResponseEvent awaitResponse() throws IOException {
+            /* This should be called from the same worker thread as handle() */
+            if (response == null) {
+                lock.lock();
+                try {
+                    if (response == null) {
+                        if (!responseReceived.await(receiveTimeout(), TimeUnit.MILLISECONDS) || response == null) {
+                            throw new SocketTimeoutException("Timeout waiting for HTTP response from " + url);
+                        }
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted waiting for HTTP response from " + url, e);
+                } finally {
+                    lock.unlock();
+                }
+            }
+            if (response.succeeded()) {
+                return response.result();
+            } else {
+                final Throwable e = response.cause();
+                throw new IOException("Unable to receive HTTP response from " + url, e);
+            }
+        }
+
+        HttpClientRequest awaitRequest() throws IOException {
+            /* This should be called from the same worker thread as handle() */
+            if (request == null) {
+                lock.lock();
+                try {
+                    if (request == null) {
+                        if (!requestReady.await(requestOptions.getConnectTimeout(), TimeUnit.MILLISECONDS) || request == null) {
+                            throw new SocketTimeoutException("Timeout waiting for HTTP connect to " + url);
+                        }
+                    }
+                    if (request.succeeded()) {
+                        awaitWriteable(request.result());
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted waiting for HTTP response from " + url, e);
+                } finally {
+                    lock.unlock();
+                }
+            }
+            if (request.succeeded()) {
+                return request.result();
+            } else {
+                final Throwable e = request.cause();
+                throw new IOException("Unable to connect to " + url, e);
+            }
+        }
+
+        static void pipe(
+                HttpClientResponse response,
+                PipedOutputStream pipedOutputStream,
+                ExceptionAwarePipedInputStream pipedInputStream
+
+        ) {
+
+            response.handler(buffer -> {
+                try {
+                    pipedOutputStream.write(buffer.getBytes());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+
+            response.endHandler(v -> {
+                try {
+                    pipedOutputStream.close();
+                } catch (IOException e) {
+                    pipedInputStream.setException(e);
+                }
+            });
+
+            response.exceptionHandler(e -> {
+                final IOException ioe = e instanceof IOException
+                        ? (IOException) e
+                        : new IOException(e);
+                pipedInputStream.setException(ioe);
+            });
+        }
+
+        void awaitWriteable(HttpClientRequest request) throws IOException, InterruptedException {
+            assert lock.isHeldByCurrentThread();
+            while (request.writeQueueFull()) {
+                if (this.request.cause() != null) {
+                    throw new IOException(this.request.cause());
+                }
+                if (Context.isOnEventLoopThread()) {
+                    throw new IllegalStateException("Attempting a blocking write on io thread");
+                }
+                if (!drainHandlerRegistered) {
+                    drainHandlerRegistered = true;
+                    final Handler<Void> drainHandler = new Handler<Void>() {
+                        @Override
+                        public void handle(Void event) {
+                            if (waitingForDrain) {
+                                lock.lock();
+                                try {
+                                    requestWriteable.signal();
+                                } finally {
+                                    lock.unlock();
+                                }
+                            }
+                        }
+                    };
+                    request.drainHandler(drainHandler);
+                }
+                try {
+                    waitingForDrain = true;
+                    requestWriteable.await(receiveTimeout(), TimeUnit.MILLISECONDS);
+                } finally {
+                    waitingForDrain = false;
+                }
+            }
+        }
+
+        /**
+         * Computes the timeout for receive related operations based on {@link #receiveTimeoutDeadline}
+         *
+         * @return the timeout in milliseconds for response related operations
+         * @throws SocketTimeoutException if {@link #receiveTimeoutDeadline} was missed already
+         */
+        long receiveTimeout() throws SocketTimeoutException {
+            final long timeout = receiveTimeoutDeadline - System.currentTimeMillis();
+            if (timeout <= 0) {
+                /* Too late already */
+                throw new SocketTimeoutException("Timeout waiting for HTTP response from " + url);
+            }
+            return timeout;
+        }
+    }
+
+    static class AsyncRequestBodyHandler implements IOEHandler<RequestBodyEvent> {
+        private final Message outMessage;
+        private final URI url;
+        private final String userAgent;
+        private final HttpClientPool clientPool;
+        private final RequestOptions requestOptions;
+        private final ClientSpec clientSpec;
+        /** Time in epoch milliseconds when the response should be fully received */
+        private final long receiveTimeoutDeadline;
+        private final IOEHandler<ResponseEvent> responseHandler;
+
+        /** Read an written only from the producer thread */
+        private boolean firstEvent = true;
+//        /**
+//         * Read from the producer thread, written from the event loop. Protected by {@link #lock} {@link #requestReady}
+//         * {@link Condition}
+//         */
+//        private Result<HttpClientRequest> request;
+        /**
+         * Read from the producer thread, written from the event loop. Protected by {@link #lock} {@link #responseReceived}
+         * {@link Condition}
+         */
+        private Result<ResponseEvent> response;
+
+        /* Locks and conditions */
+        private final ReentrantLock lock = new ReentrantLock();
+//        private final Condition requestReady = lock.newCondition();
+        private final Condition requestWriteable = lock.newCondition();
+        //private final Condition responseReceived = lock.newCondition();
+
+        /* Backpressure control when writing the request body */
+        private boolean drainHandlerRegistered;
+        private boolean waitingForDrain;
+
+        public AsyncRequestBodyHandler(
+                Message outMessage,
+                URI url,
+                String userAgent,
+                HttpClientPool clientPool,
+                RequestOptions requestOptions,
+                ClientSpec clientSpec,
+                long receiveTimeoutMs,
+                IOEHandler<ResponseEvent> responseHandler) {
+            super();
+            this.outMessage = outMessage;
+            this.url = url;
+            this.userAgent = userAgent;
+            this.clientPool = clientPool;
+            this.requestOptions = requestOptions;
+            this.clientSpec = clientSpec;
+            this.receiveTimeoutDeadline = System.currentTimeMillis() + receiveTimeoutMs;
+            this.responseHandler = responseHandler;
+        }
+
+        @Override
+        public void handle(RequestBodyEvent event) throws IOException {
+            if (firstEvent) {
+                firstEvent = false;
+                final HttpClient client = clientPool.getClient(clientSpec);
+
+                switch (event.eventType()) {
+                    case NON_FINAL_CHUNK:
+                    case FINAL_CHUNK: {
+                        break;
+                    }
+                    case COMPLETE_BODY: {
+                        requestOptions.putHeader("Content-Length", String.valueOf(event.buffer().length()));
+                        break;
+                    }
+                    default:
+                        throw new IllegalArgumentException(
+                                "Unexpected " + RequestBodyEventType.class.getName() + ": " + event.eventType());
+                }
+
+                setProtocolHeaders(outMessage, requestOptions, userAgent);
+
+                client.request(requestOptions)
+                        .onSuccess(req -> {
+                            switch (event.eventType()) {
+                                case NON_FINAL_CHUNK: {
+                                    req
+                                            .setChunked(true)
+                                            .write(event.buffer())
+                                            .onFailure(AsyncRequestBodyHandler.this::failResponse);
+
+//                                    lock.lock();
+//                                    try {
+                                        request = new Result<>(req, null);
+                                        // TODO send it async
+//                                        requestReady.signal();
+//                                    } finally {
+//                                        lock.unlock();
+//                                    }
+
+                                    break;
+                                }
+                                case FINAL_CHUNK:
+                                case COMPLETE_BODY: {
+                                    finishRequest(req, event.buffer());
+                                    break;
+                                }
+                                default:
+                                    throw new IllegalArgumentException(
+                                            "Unexpected " + RequestBodyEventType.class.getName() + ": " + event.eventType());
+
+                            }
+                        })
+                        .onFailure(t -> {
+                            lock.lock();
+                            try {
+                                request = Result.failure(t);
+                                requestReady.signal();
+
+                                /* Fail also the response so that awaitResponse() fails rather than waiting forever */
+                                response = Result.failure(t);
+                                responseReceived.signal();
+                            } finally {
+                                lock.unlock();
+                            }
+                        });
+
+                switch (event.eventType()) {
+                    case NON_FINAL_CHUNK:
+                        /* Nothing to do */
+                        break;
+                    case FINAL_CHUNK:
+                    case COMPLETE_BODY: {
+                        responseHandler.handle(awaitResponse());
+                        break;
+                    }
+                    default:
+                        throw new IllegalArgumentException(
+                                "Unexpected " + RequestBodyEventType.class.getName() + ": " + event.eventType());
+
+                }
+
+            } else {
+                /* Non-first event */
+                final HttpClientRequest req = awaitRequest();
+                switch (event.eventType()) {
+                    case NON_FINAL_CHUNK: {
+                        req
+                                .write(event.buffer())
+                                .onFailure(SyncRequestBodyHandler.this::failResponse);
+                        break;
+                    }
+                    case FINAL_CHUNK:
+                    case COMPLETE_BODY: {
+                        finishRequest(req, event.buffer());
+                        responseHandler.handle(awaitResponse());
+                        break;
+                    }
+                    default:
+                        throw new IllegalArgumentException(
+                                "Unexpected " + RequestBodyEventType.class.getName() + ": " + event.eventType());
+
+                }
+            }
+        }
+
+        void finishRequest(HttpClientRequest req, Buffer buffer) {
+            try {
+                final PipedOutputStream pipedOutputStream = new PipedOutputStream();
+                final ExceptionAwarePipedInputStream pipedInputStream = new ExceptionAwarePipedInputStream(
+                        pipedOutputStream);
+
+                req.response()
+                        .onComplete(ar -> {
+                            if (ar.succeeded()) {
+                                pipe(ar.result(), pipedOutputStream, pipedInputStream);
+                            } else {
+                                if (ar.cause() instanceof IOException) {
+                                    pipedInputStream.setException((IOException) ar.cause());
+                                } else {
+                                    pipedInputStream.setException(new IOException(ar.cause()));
+                                }
+                            }
+                            lock.lock();
+                            try {
+                                response = new Result<>(new ResponseEvent(ar.result(), pipedInputStream),
+                                        ar.cause());
+                                responseReceived.signal();
+                            } finally {
+                                lock.unlock();
+                            }
+                        });
+
+                req
+                        .end(buffer)
+                        .onFailure(SyncRequestBodyHandler.this::failResponse);
 
             } catch (IOException e) {
                 throw new VertxHttpException(e);
