@@ -41,4 +41,10 @@ public class QuarkusCxfTransportsHTTPAsyncProcessor {
         recorder.setHc5Present();
     }
 
+    @BuildStep
+    @Record(ExecutionTime.RUNTIME_INIT)
+    void workaroundBadForceURLConnectionLookup(Hc5Recorder recorder) {
+        recorder.workaroundBadForceURLConnectionLookup();
+    }
+
 }

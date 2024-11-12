@@ -35,4 +35,17 @@ public class Hc5Recorder {
             bus.setExtension(new QuarkusAsyncHttpResponseWrapperFactory(), AsyncHttpResponseWrapperFactory.class);
         });
     }
+
+    public void workaroundBadForceURLConnectionLookup() {
+        // Temporary to workaround the bad initialization of HTTPTransportFactory.forceURLConnectionConduit
+        // in the downstream CXF 4.0.5.fuse-redhat-00012:
+        // private static boolean forceURLConnectionConduit
+        // = Boolean.valueOf(SystemPropertyAction.getProperty("org.apache.cxf.transport.http.forceURLConnection", "true"));
+        // Using default "true" breaks the backwards compatibility so we set the propery to false at application startup
+        // See also https://issues.redhat.com/browse/CEQ-10395
+        if (System.getProperty("org.apache.cxf.transport.http.forceURLConnection") == null) {
+            System.setProperty("org.apache.cxf.transport.http.forceURLConnection", "false");
+        }
+    }
+
 }
