@@ -1,5 +1,5 @@
 name: rebase-dependency-main-branch
-description: 'Rebase a dependency main branch such as quarkus-main or cxf-main, rebuild it and report the status in a dedicated issue'
+description: 'Rebase a maintenenance branch such as quarkus-main or cxf-main, rebuild it and report the status in a dedicated issue'
 
 inputs:
   java-version:
@@ -11,6 +11,14 @@ inputs:
   dependency-short-name:
     description: "The short lower case name of the dependency as quarkus or cxf"
     required: true
+  dependency-branch:
+    description: "The name of the dependency branch to build against, such as main or 3.15"
+    required: true
+    default: main
+  own-maintenance-branch:
+    description: "The name of the maintenance branch in the current git repository to rebase on top of, such as main or 3.15"
+    required: true
+    default: main
   issue-id:
     description: "The issue number where to report any rebase or build issues"
     required: true
@@ -20,7 +28,7 @@ inputs:
 
 outputs:
   dependency-commit:
-    description: "The SHA1 of the dependency main branch"
+    description: "The SHA1 of the branch specified in inputs.dependency-branch against which the current build was run"
     value: ${{ steps.rebuild-dependency.outputs.dependency-commit }}
   dependency-version:
     description: "The version of the dependency as present in the top pom.xml of its main branch"
@@ -53,26 +61,26 @@ runs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         echo "REBASE_DEPENDENCY_MAIN_EXIT_STATUS=success" >> $GITHUB_ENV
-        git fetch origin main
-        git checkout main
-        git reset --hard origin/main
-        git fetch origin ${{ inputs.dependency-short-name }}-main
-        git checkout ${{ inputs.dependency-short-name }}-main >/dev/null 2>&1 || git checkout -b ${{ inputs.dependency-short-name }}-main origin/main
+        git fetch origin ${{ inputs.own-maintenance-branch }}
+        git checkout ${{ inputs.own-maintenance-branch }}
+        git reset --hard origin/${{ inputs.own-maintenance-branch }}
+        git fetch origin ${{ inputs.dependency-short-name }}-${{ inputs.dependency-branch }}
+        git checkout ${{ inputs.dependency-short-name }}-${{ inputs.dependency-branch }} >/dev/null 2>&1 || git checkout -b ${{ inputs.dependency-short-name }}-${{ inputs.dependency-branch }} origin/${{ inputs.own-maintenance-branch }}
         git status
-        echo "${{ inputs.dependency-short-name }}-main is at $(git rev-parse HEAD)"
-        git rebase main
+        echo "${{ inputs.dependency-short-name }}-${{ inputs.own-maintenance-branch }} is at $(git rev-parse HEAD)"
+        git rebase ${{ inputs.own-maintenance-branch }}
         rebaseExitCode=$?
         echo "rebaseExitCode = $rebaseExitCode"
         exit $rebaseExitCode
 
-    - name: reopen or comment on issue https://github.com/${{ github.repository }}/issues/${{ inputs.issue-id }}
+    - name: Reopen or comment on issue https://github.com/${{ github.repository }}/issues/${{ inputs.issue-id }}
       if: ${{ failure() }}
       shell: bash
       run: |
         echo "REBASE_DEPENDENCY_MAIN_EXIT_STATUS=rebase-failed" >> $GITHUB_ENV
         oldState=$(gh issue view ${{ inputs.issue-id }} --json state -q .state -R ${{ github.repository }})
         echo "oldState = $oldState"
-        msg="❌ Could not rebase ${{ inputs.dependency-short-name }}-main in ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        msg="❌ Could not rebase ${{ inputs.dependency-short-name }}-${{ inputs.own-maintenance-branch }} in ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         if [[ "$oldState" == "OPEN" ]] ; then
           gh issue comment \
             --repo ${{ github.repository }} \
