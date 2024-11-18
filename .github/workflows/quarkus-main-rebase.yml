@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
   schedule:
     # Run every day at 2AM
-    - cron:  '0 2 * * *'
+    - cron:  '0 3 * * *'
 
 env:
   LANG: en_US.UTF-8
-  ISSUE_ID: 1287
+  ISSUE_ID: 1607
   DEPENDENCY_SHORT_NAME: quarkus
   JAVA_VERSION: 17
 
@@ -32,8 +32,8 @@ jobs:
         java-version: ${{ env.JAVA_VERSION }}
         dependency-git-repo-url: https://github.com/quarkusio/quarkus.git
         dependency-short-name: ${{ env.DEPENDENCY_SHORT_NAME }}
-        dependency-branch: main
-        own-maintenance-branch: main
+        dependency-branch: 3.15
+        own-maintenance-branch: 3.15
         issue-id: ${{ env.ISSUE_ID }}
         token: "${{ secrets.QUARKIVERSEBOT_TOKEN }}"
 
