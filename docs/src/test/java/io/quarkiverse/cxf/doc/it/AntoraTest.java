@@ -45,6 +45,9 @@ public class AntoraTest {
             ignorables.add("https://github.com/quarkiverse/quarkus-cxf/compare/3.17.2...3.18.0");
         }
 
-        AntoraTestUtils.assertExternalLinksValid(err -> ignorables.contains(err.uri()));
+        AntoraTestUtils
+                .assertLinksValid(err -> ignorables.contains(err.uri())
+                        || err.uri().startsWith("http://localhost:8080")
+                        || err.uri().startsWith("http://localhost:8082"));
     }
 }
