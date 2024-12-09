@@ -165,7 +165,7 @@
                             <goal>build</goal>
                         </goals>
                         <configuration>
-                            <skip>${skipTests}</skip>
+                            <!-- <skip>${skipTests}</skip> -->
                         </configuration>
                     </execution>
                 </executions>
