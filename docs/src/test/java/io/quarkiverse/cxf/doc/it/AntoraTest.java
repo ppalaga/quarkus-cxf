@@ -30,7 +30,7 @@ public class AntoraTest {
     }
 
     @Test
-    public void externalLinks() {
+    public void linksValid() {
 
         Set<String> ignorables1 = Set.of(
                 "http://quarkus.io/training",
@@ -46,8 +46,14 @@ public class AntoraTest {
         }
 
         AntoraTestUtils
-                .assertLinksValid(err -> ignorables.contains(err.uri())
-                        || err.uri().startsWith("http://localhost:8080")
-                        || err.uri().startsWith("http://localhost:8082"));
+                .links()
+                .exclude(uri -> uri.startsWith("http://localhost:8080")
+                        || uri.startsWith("http://localhost:8082"))
+                .excludeEditThisPage()
+                .log()
+                .validate()
+                .ignore(err -> ignorables.contains(err.uri()))
+                .assertValid();
+
     }
 }
