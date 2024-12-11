@@ -6,6 +6,7 @@ import java.time.ZonedDateTime;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
+import java.util.regex.Pattern;
 
 import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.Test;
@@ -32,12 +33,10 @@ public class AntoraTest {
     @Test
     public void linksValid() {
 
-        Set<String> ignorables1 = Set.of(
+        Set<String> excludes = Set.of(
                 "http://quarkus.io/training",
-                "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/role",
-                "http://schemas.xmlsoap.org/ws/2005/02/sc/dk/p_sha1",
                 "http://www.w3.org/2009/xmlenc11#aes256-gcm");
-        final Set<String> ignorables = new LinkedHashSet<>(ignorables1);
+        final Set<String> ignorables = new LinkedHashSet<>();
 
         final ZonedDateTime deadline = ZonedDateTime.parse("2025-01-28T23:59:59+01:00[Europe/Paris]");
         if (ZonedDateTime.now(ZoneId.of("Europe/Paris")).isBefore(deadline)) {
@@ -47,12 +46,14 @@ public class AntoraTest {
 
         AntoraTestUtils
                 .links()
-                .exclude(uri -> uri.startsWith("http://localhost:8080")
-                        || uri.startsWith("http://localhost:8082"))
+                .exclude(link -> excludes.contains(link.resolvedUri()))
+                .excludeResolved(Pattern.compile("^\\Qhttp://localhost:808\\E[02].*"))
+                .excludeResolved(Pattern.compile("^\\Qhttp://schemas.xmlsoap.org/\\E.*"))
+                .includeResolved(Pattern.compile("^\\Qhttp://localhost:8081\\E.*"))
                 .excludeEditThisPage()
                 .log()
                 .validate()
-                .ignore(err -> ignorables.contains(err.uri()))
+                .ignore(err -> ignorables.contains(err.uri().resolvedUri()))
                 .assertValid();
 
     }
