@@ -21,8 +21,9 @@ class AsyncVertxClientTest {
         Assumptions.assumeThat(HTTPConduitImpl.findDefaultHTTPConduitImpl())
                 .isNotEqualTo(HTTPConduitImpl.URLConnectionHTTPConduitFactory);
 
+        final String body = body();
         RestAssured.given()
-                .body("Joe")
+                .body(body)
                 .post("/RestAsyncWithWsdl/helloWithWsdl")
                 .then()
                 .statusCode(500)
@@ -37,12 +38,13 @@ class AsyncVertxClientTest {
         Assumptions.assumeThat(HTTPConduitImpl.findDefaultHTTPConduitImpl())
                 .isNotEqualTo(HTTPConduitImpl.URLConnectionHTTPConduitFactory);
 
+        final String body = body();
         RestAssured.given()
-                .body("Joe")
+                .body(body)
                 .post("/RestAsyncWithWsdlWithBlocking/helloWithWsdlWithBlocking")
                 .then()
                 .statusCode(200)
-                .body(is("Hello Joe from HelloWithWsdlWithBlocking"));
+                .body(is("Hello " + body + " from HelloWithWsdlWithBlocking"));
     }
 
     @Test
@@ -51,12 +53,13 @@ class AsyncVertxClientTest {
         Assumptions.assumeThat(HTTPConduitImpl.findDefaultHTTPConduitImpl())
                 .isNotEqualTo(HTTPConduitImpl.URLConnectionHTTPConduitFactory);
 
+        final String body = body();
         RestAssured.given()
-                .body("Max")
+                .body(body)
                 .post("/RestAsyncWithWsdlWithEagerInit/helloWithWsdlWithEagerInit")
                 .then()
                 .statusCode(200)
-                .body(is("Hello Max from HelloWithWsdlWithEagerInit"));
+                .body(is("Hello " + body + " from HelloWithWsdlWithEagerInit"));
     }
 
     @Test
@@ -65,12 +68,13 @@ class AsyncVertxClientTest {
         Assumptions.assumeThat(HTTPConduitImpl.findDefaultHTTPConduitImpl())
                 .isNotEqualTo(HTTPConduitImpl.URLConnectionHTTPConduitFactory);
 
+        final String body = body();
         RestAssured.given()
-                .body("Joe")
+                .body(body)
                 .post("/RestAsyncWithoutWsdl/helloWithoutWsdl")
                 .then()
                 .statusCode(200)
-                .body(is("Hello Joe from HelloWithoutWsdl"));
+                .body(is("Hello " + body + " from HelloWithoutWsdl"));
     }
 
     @Test
@@ -79,18 +83,24 @@ class AsyncVertxClientTest {
         Assumptions.assumeThat(HTTPConduitImpl.findDefaultHTTPConduitImpl())
                 .isNotEqualTo(HTTPConduitImpl.URLConnectionHTTPConduitFactory);
 
+        final String body = body();
         RestAssured.given()
-                .body("Joe")
+                .body(body)
                 .post("/RestAsyncWithoutWsdlWithBlocking/helloWithoutWsdlWithBlocking")
                 .then()
                 .statusCode(200)
-                .body(is("Hello Joe from HelloWithoutWsdlWithBlocking"));
+                .body(is("Hello " + body + " from HelloWithoutWsdlWithBlocking"));
     }
 
     static String body() {
         final MemorySizeConverter converter = new MemorySizeConverter();
         final int payloadLen = (int) converter.convert("9M").asLongValue();
-        return LargeSlowServiceImpl.largeString(payloadLen);
+        final StringBuilder sb = new StringBuilder();
+        while (sb.length() < payloadLen) {
+            sb.append("0123456789");
+        }
+        sb.setLength(payloadLen);
+        return sb.toString();
     }
 
 }
