@@ -7,6 +7,8 @@ import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.Test;
 
 import io.quarkiverse.cxf.HTTPConduitImpl;
+import io.quarkiverse.cxf.it.large.slow.LargeSlowServiceImpl;
+import io.quarkus.runtime.configuration.MemorySizeConverter;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.RestAssured;
 
@@ -50,8 +52,8 @@ class AsyncVertxClientTest {
                 .isNotEqualTo(HTTPConduitImpl.URLConnectionHTTPConduitFactory);
 
         RestAssured.given()
-                .queryParam("person", "Max")
-                .get("/RestAsyncWithWsdlWithEagerInit/helloWithWsdlWithEagerInit")
+                .body("Max")
+                .post("/RestAsyncWithWsdlWithEagerInit/helloWithWsdlWithEagerInit")
                 .then()
                 .statusCode(200)
                 .body(is("Hello Max from HelloWithWsdlWithEagerInit"));
@@ -64,8 +66,8 @@ class AsyncVertxClientTest {
                 .isNotEqualTo(HTTPConduitImpl.URLConnectionHTTPConduitFactory);
 
         RestAssured.given()
-                .queryParam("person", "Joe")
-                .get("/RestAsyncWithoutWsdl/helloWithoutWsdl")
+                .body("Joe")
+                .post("/RestAsyncWithoutWsdl/helloWithoutWsdl")
                 .then()
                 .statusCode(200)
                 .body(is("Hello Joe from HelloWithoutWsdl"));
@@ -78,11 +80,17 @@ class AsyncVertxClientTest {
                 .isNotEqualTo(HTTPConduitImpl.URLConnectionHTTPConduitFactory);
 
         RestAssured.given()
-                .queryParam("person", "Joe")
-                .get("/RestAsyncWithoutWsdlWithBlocking/helloWithoutWsdlWithBlocking")
+                .body("Joe")
+                .post("/RestAsyncWithoutWsdlWithBlocking/helloWithoutWsdlWithBlocking")
                 .then()
                 .statusCode(200)
                 .body(is("Hello Joe from HelloWithoutWsdlWithBlocking"));
+    }
+
+    static String body() {
+        final MemorySizeConverter converter = new MemorySizeConverter();
+        final int payloadLen = (int) converter.convert("9M").asLongValue();
+        return LargeSlowServiceImpl.largeString(payloadLen);
     }
 
 }
