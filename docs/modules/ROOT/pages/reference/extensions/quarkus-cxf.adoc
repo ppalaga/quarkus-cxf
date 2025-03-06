@@ -599,6 +599,18 @@ Other Quarkus extensions do not take `javax.net.ssl.trustStore` system property 
 *Environment variable*: `+++QUARKUS_CXF_CLIENT_TLS_CONFIGURATION_NAME+++` +
 *Since Quarkus CXF*: 3.19.0
 
+.<| [[quarkus-cxf_quarkus-cxf-client-wsdl-on-load-failure]]`link:#quarkus-cxf_quarkus-cxf-client-wsdl-on-load-failure[quarkus.cxf.client.wsdl.on-load-failure]`
+.<| `fail`, `warn`
+.<| `fail`
+
+3+a|What to do when a remote WSDL document is not accessible:
+
+* `fail` - make the client unusable by throwing an exception
+* `warn` - output a warning to the application log and let the client continue as if WSDL was not set
+
+*Environment variable*: `+++QUARKUS_CXF_CLIENT_WSDL_ON_LOAD_FAILURE+++` +
+*Since Quarkus CXF*: 3.20.0
+
 .<| [[quarkus-cxf_quarkus-cxf-logging-enabled-for]]`link:#quarkus-cxf_quarkus-cxf-logging-enabled-for[quarkus.cxf.logging.enabled-for]`
 .<| `clients`, `services`, `both`, `none`
 .<| `none`

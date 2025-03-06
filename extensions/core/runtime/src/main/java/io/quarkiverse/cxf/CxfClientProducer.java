@@ -153,8 +153,9 @@ public abstract class CxfClientProducer {
         if (cxfClientInfo.getSoapBinding() != null) {
             factory.setBindingId(cxfClientInfo.getSoapBinding());
         }
-        if (cxfClientInfo.getWsdlUrl() != null && !cxfClientInfo.getWsdlUrl().isEmpty()) {
-            factory.setWsdlURL(cxfClientInfo.getWsdlUrl());
+        final String wsdlUrl = cxfClientInfo.getWsdlUrl();
+        if (wsdlUrl != null && !wsdlUrl.isEmpty()) {
+            factory.setWsdlURL(wsdlUrl);
         }
 
         final AuthorizationPolicy authorizationPolicy = authorizationPolicy(cxfClientInfo.getAuth());

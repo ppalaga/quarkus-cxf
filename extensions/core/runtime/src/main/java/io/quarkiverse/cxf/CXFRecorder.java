@@ -11,7 +11,6 @@ import java.util.function.Consumer;
 import org.apache.cxf.Bus;
 import org.apache.cxf.io.CachedConstants;
 import org.apache.cxf.transport.http.HTTPTransportFactory;
-import org.apache.cxf.wsdl.WSDLManager;
 import org.jboss.logging.Logger;
 
 import io.netty.util.internal.shaded.org.jctools.queues.MessagePassingQueue.Supplier;
@@ -19,7 +18,6 @@ import io.quarkiverse.cxf.CxfConfig.RetransmitCacheConfig;
 import io.quarkiverse.cxf.annotation.CXFEndpoint;
 import io.quarkiverse.cxf.transport.CxfHandler;
 import io.quarkiverse.cxf.transport.VertxDestinationFactory;
-import io.quarkiverse.cxf.wsdl.QuarkusWSDLManager;
 import io.quarkus.arc.Arc;
 import io.quarkus.arc.runtime.BeanContainer;
 import io.quarkus.runtime.RuntimeValue;
@@ -292,16 +290,21 @@ public class CXFRecorder {
     /**
      * Temporary workaround for https://github.com/quarkiverse/quarkus-cxf/issues/1608
      */
-    public RuntimeValue<Consumer<Bus>> setQuarkusWSDLManager() {
-        return new RuntimeValue<>(bus -> bus.setExtension(QuarkusWSDLManager.newInstance(bus), WSDLManager.class));
+    public RuntimeValue<Consumer<Bus>> setQuarkusWSDLManager(CxfConfig config) {
+        final FailureRemedy onLoadFailure = config.client().wsdlLoadFailureRemedy();
+        return new RuntimeValue<>(bus -> {
+            //bus.setExtension(QuarkusWSDLManager.newInstance(bus, onLoadFailure), WSDLManager.class);
+        });
     }
 
     public void workaroundBadForceURLConnectionInit() {
         // A workaround for the bad initialization of HTTPTransportFactory.forceURLConnectionConduit
         // in the downstream CXF 4.0.5.fuse-redhat-00012:
         // private static boolean forceURLConnectionConduit
-        // = Boolean.valueOf(SystemPropertyAction.getProperty("org.apache.cxf.transport.http.forceURLConnection", "true"));
-        // Using default "true" breaks the backwards compatibility for us, so we set the property to false at application startup
+        // = Boolean.valueOf(SystemPropertyAction.getProperty("org.apache.cxf.transport.http.forceURLConnection",
+        // "true"));
+        // Using default "true" breaks the backwards compatibility for us, so we set the property to false at
+        // application startup
         // See also https://issues.redhat.com/browse/CEQ-10395
         Field forceURLConnectionConduitField = null;
         for (Field f : HTTPTransportFactory.class.getDeclaredFields()) {

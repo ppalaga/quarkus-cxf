@@ -523,11 +523,12 @@ public class CxfClientProcessor {
      * Temporary workaround for https://github.com/quarkiverse/quarkus-cxf/issues/1608
      */
     @BuildStep
-    @Record(ExecutionTime.STATIC_INIT)
+    @Record(ExecutionTime.RUNTIME_INIT)
     void workaroundAsyncWsdlInit(
             CXFRecorder recorder,
+            CxfConfig cxfConfig,
             BuildProducer<RuntimeBusCustomizerBuildItem> customizers) {
-        customizers.produce(new RuntimeBusCustomizerBuildItem(recorder.setQuarkusWSDLManager()));
+        customizers.produce(new RuntimeBusCustomizerBuildItem(recorder.setQuarkusWSDLManager(cxfConfig)));
     }
 
     /**

@@ -10,7 +10,6 @@ import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.wsdl.Definition;
@@ -23,7 +22,6 @@ import javax.xml.stream.XMLStreamReader;
 
 import org.apache.cxf.Bus;
 import org.apache.cxf.BusException;
-import org.apache.cxf.common.logging.LogUtils;
 import org.apache.cxf.helpers.IOUtils;
 import org.apache.cxf.helpers.LoadingByteArrayOutputStream;
 import org.apache.cxf.message.Exchange;
@@ -44,24 +42,28 @@ import org.apache.cxf.wsdl11.WSDLManagerImpl;
 import org.w3c.dom.Document;
 import org.xml.sax.InputSource;
 
+import io.quarkiverse.cxf.FailureRemedy;
+
 /**
  * Temporary workaround for https://github.com/quarkiverse/quarkus-cxf/issues/1608
  */
 public class QuarkusWSDLManager extends WSDLManagerImpl {
 
+    private final FailureRemedy onLoadFailure;
     private final ExtensionRegistry registry;
     private XMLStreamReaderWrapper xmlStreamReaderWrapper;
 
-    public static QuarkusWSDLManager newInstance(Bus b) {
+    public static QuarkusWSDLManager newInstance(Bus b, FailureRemedy onLoadFailure) {
         try {
-            return new QuarkusWSDLManager(b);
+            return new QuarkusWSDLManager(b, onLoadFailure);
         } catch (BusException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private QuarkusWSDLManager(Bus b) throws BusException {
+    private QuarkusWSDLManager(Bus b, FailureRemedy onLoadFailure) throws BusException {
         super();
+        this.onLoadFailure = onLoadFailure;
         this.registry = getField(WSDLManagerImpl.class, this, "registry");
         setBus(b);
     }
@@ -103,7 +105,7 @@ public class QuarkusWSDLManager extends WSDLManagerImpl {
         //from the definition.  With this, the String the definition holds onto would be unique
         url = new String(url);
         CatalogWSDLLocator catLocator = new CatalogWSDLLocator(url, bus);
-        setField(CatalogWSDLLocator.class, catLocator, "resolver", new QuarkusTransportURIResolver(bus));
+        setField(CatalogWSDLLocator.class, catLocator, "resolver", new QuarkusTransportURIResolver(bus, onLoadFailure));
 
         final ResourceManagerWSDLLocator wsdlLocator = new ResourceManagerWSDLLocator(url,
                 catLocator,
@@ -170,7 +172,7 @@ public class QuarkusWSDLManager extends WSDLManagerImpl {
     }
 
     static class QuarkusTransportURIResolver extends TransportURIResolver {
-        static final Logger LOG = LogUtils.getL7dLogger(TransportURIResolver.class);
+        static final org.jboss.logging.Logger LOG = org.jboss.logging.Logger.getLogger(TransportURIResolver.class);
         private static final Set<String> DEFAULT_URI_RESOLVER_HANDLES = new HashSet<>();
         static {
             //bunch we really don't want to have the conduits checked for
@@ -182,9 +184,11 @@ public class QuarkusWSDLManager extends WSDLManagerImpl {
             DEFAULT_URI_RESOLVER_HANDLES.add("jar");
             DEFAULT_URI_RESOLVER_HANDLES.add("zip");
         }
+        private final FailureRemedy onLoadFailure;
 
-        public QuarkusTransportURIResolver(Bus b) {
+        public QuarkusTransportURIResolver(Bus b, FailureRemedy onLoadFailure) {
             super(b);
+            this.onLoadFailure = onLoadFailure;
         }
 
         @Override
@@ -204,7 +208,7 @@ public class QuarkusWSDLManager extends WSDLManagerImpl {
             } catch (URISyntaxException use) {
                 //ignore
                 base = null;
-                LOG.log(Level.FINEST, "Could not resolve curUri " + curUri, use);
+                LOG.tracef(use, "Could not resolve curUri %s", curUri);
             }
             try {
                 if (base == null
@@ -213,7 +217,7 @@ public class QuarkusWSDLManager extends WSDLManagerImpl {
                 }
             } catch (Exception ex) {
                 //nothing
-                LOG.log(Level.FINEST, "Default URI handlers could not resolve " + baseUri + " " + curUri, ex);
+                LOG.tracef(ex, "Default URI handlers could not resolve %s %s", baseUri, curUri);
             }
             if (is == null && base != null
                     && base.getScheme() != null
@@ -275,15 +279,29 @@ public class QuarkusWSDLManager extends WSDLManagerImpl {
                         return src;
                     }
                 } catch (Exception e) {
-                    throw new RuntimeException("Conduit initiator could not resolve " + baseUri + " " + curUri, e);
+                    switch (onLoadFailure) {
+                        case fail: {
+                            throw new RuntimeException("Conduit initiator could not resolve " + base, e);
+                        }
+                        case warn: {
+                            LOG.warnf(e, "Conduit initiator could not resolve %s", base);
+                            break;
+                        }
+                        default:
+                            throw new IllegalArgumentException("Unexpected value: " + onLoadFailure);
+                    }
                 }
             }
+            System.out.println("=== is " + is);
+            System.out.println("=== base " + base);
+            System.out.println("=== DEFAULT_URI_RESOLVER_HANDLES " + DEFAULT_URI_RESOLVER_HANDLES);
             if (is == null
                     && (base == null
                             || base.getScheme() == null
                             || !DEFAULT_URI_RESOLVER_HANDLES.contains(base.getScheme()))) {
                 is = super.resolve(curUri, baseUri);
             }
+            System.out.println("=== is returning " + is);
             return is;
         }
     }

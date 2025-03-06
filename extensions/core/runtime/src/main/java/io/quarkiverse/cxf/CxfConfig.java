@@ -183,6 +183,19 @@ public interface CxfConfig {
         // @formatter:on
         @WithDefault("javax.net.ssl")
         public String tlsConfigurationName();
+
+        /**
+         * What to do when a remote WSDL document is not accessible:
+         *
+         * * `fail` - make the client unusable by throwing an exception
+         * * `warn` - output a warning to the application log and let the client continue as if WSDL was not set
+         *
+         * @asciidoclet
+         * @since 3.20.0
+         */
+        @WithDefault("fail")
+        @WithName("wsdl.on-load-failure")
+        public FailureRemedy wsdlLoadFailureRemedy();
     }
 
     public interface InternalConfig {
