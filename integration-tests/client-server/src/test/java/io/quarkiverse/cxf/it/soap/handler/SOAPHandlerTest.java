@@ -18,7 +18,7 @@ import io.restassured.RestAssured;
 @QuarkusTest
 class SOAPHandlerTest {
     private static final Logger log = Logger.getLogger(SOAPHandlerTest.class);
-    private static final int WORKERS_COUNT = 128;
+    private static final int WORKERS_COUNT = 256;
     private static final int ITERATIONS_COUNT = 16;
 
     @Test

@@ -78,6 +78,8 @@ public class CxfMutinyUtils {
                             subscribeIntenal(downstream, terminated);
                         }
                         return null;
+                    }).onFailure(e -> {
+                        e.printStackTrace();
                     });
                 } else {
                     /*
@@ -137,6 +139,8 @@ public class CxfMutinyUtils {
                             subscribeIntenal(downstream, terminated);
                         }
                         return null;
+                    }).onFailure(e -> {
+                        e.printStackTrace();
                     });
                 } else {
                     /*
