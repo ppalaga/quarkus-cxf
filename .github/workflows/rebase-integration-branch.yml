@@ -69,6 +69,7 @@ jobs:
         dependency-short-name: ${{ matrix.dependency-short-name }}
         dependency-stream: ${{ matrix.dependency-stream }}
         dependency-branch: ${{ matrix.dependency-branch }}
+        base-branch: ${{ matrix.base-branch }}
         issue-id: ${{ matrix.issue-id }}
         token: "${{ secrets.GITHUB_TOKEN }}"
 
