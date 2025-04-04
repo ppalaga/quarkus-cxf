@@ -79,7 +79,9 @@ public class CxfMutinyUtils {
                         }
                         return null;
                     }).onFailure(e -> {
-                        e.printStackTrace();
+                        if (!terminated.getAndSet(true)) {
+                            downstream.onFailure(e);
+                        }
                     });
                 } else {
                     /*

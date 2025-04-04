@@ -183,6 +183,20 @@ public interface CxfConfig {
         // @formatter:on
         @WithDefault("javax.net.ssl")
         public String tlsConfigurationName();
+
+        /**
+         * A timeout within which a CXF client call must start executing on a worker thread unless the call is on a worker thread already.
+         *
+         * Background: if a CXF client is called on a Vert.x Event Loop thread, {quarkus-cxf-project-name} always
+         * dispatches the call to a worker thread.
+         * In some
+         *
+         * @asciidoclet
+         * @since 3.21.2
+         */
+        @WithDefault("10000")
+        public long workerDispatchTimeout();
+
     }
 
     public interface InternalConfig {
