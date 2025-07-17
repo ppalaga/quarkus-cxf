@@ -3,6 +3,7 @@ package io.quarkiverse.cxf.perf.uuid.client;
 import java.io.IOException;
 import java.util.UUID;
 
+import org.apache.http.params.CoreConnectionPNames;
 import org.eclipse.microprofile.config.ConfigProvider;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.RestAssured;
+import io.restassured.config.HttpClientConfig;
 
 @QuarkusTest
 @QuarkusTestResource(EchoUuidClientTestResource.class)
@@ -28,6 +30,22 @@ public class EchoUuidClientTest {
     @Test
     void echoUuidWsUrlConnectionSync() throws IOException {
         assertClient("echoUuidWsUrlConnection/sync");
+    }
+
+    @Test
+    void bulkAsync() {
+
+        int requestCount = 90000;
+        RestAssured.given()
+                .config(RestAssured.config()
+                        .httpClient(HttpClientConfig.httpClientConfig()
+                                .setParam(CoreConnectionPNames.CONNECTION_TIMEOUT, 5000) // Connection timeout
+                                .setParam(CoreConnectionPNames.SO_TIMEOUT, 60000)))
+                .body(String.valueOf(requestCount))
+                .post("/clients/echoUuidWsVertx/async/bulk")
+                .then()
+                .statusCode(200)
+                .body(Matchers.is(String.valueOf(requestCount)));
     }
 
     private void assertClient(String client) {
