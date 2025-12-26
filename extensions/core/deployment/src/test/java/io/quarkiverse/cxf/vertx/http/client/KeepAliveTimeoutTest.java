@@ -89,9 +89,9 @@ public class KeepAliveTimeoutTest {
                 .overrideConfigKey("qcxf.baseUri", http1xBaseUri);
 
         for (HttpVersion v : HttpVersion.values()) {
+            final String baseUri = baseUris.get(v);
             for (String connectionValue : List.of("keep-alive", "close")) {
                 String k = "quarkus.cxf.client." + connectionValue + "-client_" + v.name();
-                String baseUri = baseUris.get(v);
                 if (baseUri.startsWith("https://")) {
                     result.overrideConfigKey(k + ".tls-configuration-name", "client-pkcs12");
                 }
@@ -103,6 +103,21 @@ public class KeepAliveTimeoutTest {
                         .overrideConfigKey(k + ".version", plainVersion(v))
                         .overrideConfigKey(k + ".logging.enabled", "pretty");
             }
+
+            String connectionValue = "keep-alive";
+            String k = "quarkus.cxf.client." + connectionValue + "-with-timeout-client_" + v.name();
+            if (baseUri.startsWith("https://")) {
+                result.overrideConfigKey(k + ".tls-configuration-name", "client-pkcs12");
+            }
+            result.overrideConfigKey(k + ".client-endpoint-url", baseUri + "/echoHeaders/" + v.name())
+                    .overrideConfigKey(k + ".service-interface", EchoHeadersService.class.getName())
+                    /* This scenario works only with vert.x client */
+                    .overrideConfigKey(k + ".http-conduit-factory", "VertxHttpClientHTTPConduitFactory")
+                    .overrideConfigKey(k + ".connection", connectionValue)
+                    .overrideConfigKey(k + ".keep-alive-timeout", "1")
+                    .overrideConfigKey(k + ".version", plainVersion(v))
+                    .overrideConfigKey(k + ".logging.enabled", "pretty");
+
         }
 
         return result;
@@ -160,6 +175,13 @@ public class KeepAliveTimeoutTest {
     @CXFClient("close-client_HTTP_2")
     EchoHeadersService closeClient_HTTP_2;
 
+    @CXFClient("keep-alive-with-timeout-client_HTTP_1_0")
+    EchoHeadersService keepAliveWithTimeoutClient_HTTP_1_0;
+    @CXFClient("keep-alive-with-timeout-client_HTTP_1_1")
+    EchoHeadersService keepAliveWithTimeoutClient_HTTP_1_1;
+    @CXFClient("keep-alive-with-timeout-client_HTTP_2")
+    EchoHeadersService keepAliveWithTimeoutClient_HTTP_2;
+
     @ConfigProperty(name = "qcxf.baseUri")
     String baseUri;
 
@@ -179,19 +201,24 @@ public class KeepAliveTimeoutTest {
     }
 
     @Test
+    void closeClient_HTTP_1_0() {
+        close(closeClient_HTTP_1_0, HttpVersion.HTTP_1_0, ConnectionType.CLOSE.value());
+    }
+
+    @Test
+    void closeClient_HTTP_1_1() {
+        close(closeClient_HTTP_1_1, HttpVersion.HTTP_1_1, ConnectionType.CLOSE.value());
+    }
+
+    @Test
     void closeClient_HTTP_2() {
         /* connection: close behaves the same as connection: keep-alive with HTTP/2 because the config value is ignored */
         keepAlive(closeClient_HTTP_2, HttpVersion.HTTP_2, "null" /* the client should not send the connection header */);
     }
 
     @Test
-    void closeClient_HTTP_1_0() {
-        close(closeClient_HTTP_1_0, HttpVersion.HTTP_1_0);
-    }
-
-    @Test
-    void closeClient_HTTP_1_1() {
-        close(closeClient_HTTP_1_1, HttpVersion.HTTP_1_1);
+    void keepAliveWithTimeoutClient_HTTP_1_0() {
+        close(keepAliveWithTimeoutClient_HTTP_1_0, HttpVersion.HTTP_1_0, ConnectionType.KEEP_ALIVE.value());
     }
 
     static void keepAlive(EchoHeadersService client, HttpVersion httpVersion, String expectedConnectionValue) {
@@ -213,12 +240,12 @@ public class KeepAliveTimeoutTest {
         }
     }
 
-    void close(EchoHeadersService client, HttpVersion httpVersion) {
+    void close(EchoHeadersService client, HttpVersion httpVersion, String expectedConnectionValue) {
         Map<String, String> resp = toMap(client.getRequestHeaders("connection"));
         Assertions.assertThat(resp).containsOnlyKeys("cnId", "connection");
         final String cnId = resp.get("cnId");
         Assertions.assertThat(cnId).isNotBlank();
-        Assertions.assertThat(resp.get("connection")).isEqualToIgnoringCase(ConnectionType.CLOSE.value());
+        Assertions.assertThat(resp.get("connection")).isEqualToIgnoringCase(expectedConnectionValue);
 
         /* Await the connection close */
         RestAssured.get(baseUri + "/closedConnections/" + httpVersion.name())
