@@ -995,28 +995,29 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
             boolean addHeaders = MessageUtils.getContextualBoolean(outMessage, Headers.ADD_HEADERS_PROPERTY, false);
 
             for (Map.Entry<String, List<String>> header : h.headerMap().entrySet()) {
-                if (HttpHeaderHelper.CONTENT_TYPE.equalsIgnoreCase(header.getKey())) {
+                final String key = header.getKey();
+                if (HttpHeaderHelper.CONTENT_TYPE.equalsIgnoreCase(key)) {
                     continue;
                 }
-                if (HttpHeaderHelper.CONNECTION.equalsIgnoreCase(header.getKey()) && version != HttpVersion.HTTP_1_0
+                if (HttpHeaderHelper.CONNECTION.equalsIgnoreCase(key) && version != HttpVersion.HTTP_1_0
                         && version != HttpVersion.HTTP_1_1) {
                     continue;
                 }
-                if (addHeaders || HttpHeaderHelper.COOKIE.equalsIgnoreCase(header.getKey())) {
+                if (addHeaders || HttpHeaderHelper.COOKIE.equalsIgnoreCase(key)) {
                     List<String> values = header.getValue();
                     for (String s : values) {
                         outHeaders.add(HttpHeaderHelper.COOKIE, s);
                     }
-                } else if (!"Content-Length".equalsIgnoreCase(header.getKey())) {
+                } else if (!"Content-Length".equalsIgnoreCase(key)) {
                     final List<String> values = header.getValue();
                     final int len = values.size();
                     switch (len) {
                         case 0: {
-                            outHeaders.set(header.getKey(), "");
+                            outHeaders.set(key, "");
                             break;
                         }
                         case 1: {
-                            outHeaders.set(header.getKey(), values.get(0));
+                            outHeaders.set(key, values.get(0));
                             break;
                         }
                         default:
@@ -1027,7 +1028,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                                     b.append(',');
                                 }
                             }
-                            outHeaders.set(header.getKey(), b.toString());
+                            outHeaders.set(key, b.toString());
                             break;
                     }
                 }
