@@ -15,7 +15,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import org.assertj.core.api.Assertions;
-import org.eclipse.microprofile.config.ConfigProvider;
 import org.hamcrest.CoreMatchers;
 import org.hamcrest.Matchers;
 import org.jboss.logging.Logger;
@@ -124,8 +123,9 @@ class LargeSlowTest {
      */
     @Test
     void wsdlUpToDate() throws IOException {
-        final int port = ConfigProvider.getConfig()
-                .getValue("quarkus.http.test-port", Integer.class);
+        // final int port = ConfigProvider.getConfig().getValue("quarkus.http.test-port", Integer.class);
+        // FIXME: workaround for https://github.com/quarkusio/quarkus/issues/51745
+        final int port = 8081;
         final String wsdlUrl = "http://localhost:" + port + "/soap/largeSlow?wsdl";
         Path staticCopyPath = Paths.get("src/main/resources/wsdl/LargeSlow.wsdl");
 

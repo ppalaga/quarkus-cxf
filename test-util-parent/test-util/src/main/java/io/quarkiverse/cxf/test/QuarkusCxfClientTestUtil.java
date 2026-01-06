@@ -54,8 +54,10 @@ public class QuarkusCxfClientTestUtil {
 
     public static String getServerUrl() {
         final Config config = ConfigProvider.getConfig();
-        final int port = LaunchMode.current().equals(LaunchMode.TEST) ? config.getValue("quarkus.http.test-port", Integer.class)
-                : config.getValue("quarkus.http.port", Integer.class);
+        // final int port = LaunchMode.current().equals(LaunchMode.TEST) ? config.getValue("quarkus.http.test-port", Integer.class)
+        //      : config.getValue("quarkus.http.port", Integer.class);
+        // FIXME: workaround for https://github.com/quarkusio/quarkus/issues/51745
+        final int port = LaunchMode.current().equals(LaunchMode.TEST) ? 8081 : 8080;
         return String.format("http://localhost:%d", port);
     }
 
