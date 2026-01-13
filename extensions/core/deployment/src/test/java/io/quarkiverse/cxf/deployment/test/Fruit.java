@@ -14,6 +14,10 @@ import jakarta.xml.bind.annotation.XmlType;
 })
 public class Fruit {
 
+    static {
+        new RuntimeException("Loading Fruit").printStackTrace();
+    }
+
     @XmlElement
     private String name;
 

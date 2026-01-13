@@ -9,9 +9,6 @@ import org.jboss.shrinkwrap.api.spec.JavaArchive;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
-import io.quarkiverse.cxf.deployment.test.Fruit;
-import io.quarkiverse.cxf.deployment.test.FruitWebService;
-import io.quarkiverse.cxf.deployment.test.GreetingWebService;
 import io.quarkus.test.QuarkusUnitTest;
 
 public class WsdlNameTemplateJava2WsTest {
@@ -21,9 +18,9 @@ public class WsdlNameTemplateJava2WsTest {
     @RegisterExtension
     public static final QuarkusUnitTest test = new QuarkusUnitTest()
             .setArchiveProducer(() -> ShrinkWrap.create(JavaArchive.class)
-                    .addClass(GreetingWebService.class)
-                    .addClass(FruitWebService.class)
-                    .addClass(Fruit.class))
+                    .addClass("io.quarkiverse.cxf.deployment.test.GreetingWebService")
+                    .addClass("io.quarkiverse.cxf.deployment.test.FruitWebService")
+                    .addClass("io.quarkiverse.cxf.deployment.test.Fruit"))
             .overrideConfigKey("quarkus.cxf.java2ws.GS.includes", "**.GreetingWebService")
             /*
              * Make sure that we do not write to target/classes, because otherwise the WSDL could end up in the extension

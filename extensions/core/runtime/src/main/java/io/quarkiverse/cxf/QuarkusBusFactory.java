@@ -22,8 +22,11 @@ import org.apache.cxf.jaxws.spi.WrapperClassCreator;
 import org.apache.cxf.jaxws.spi.WrapperClassLoader;
 import org.apache.cxf.wsdl.ExtensionClassCreator;
 import org.apache.cxf.wsdl.ExtensionClassLoader;
+import org.jboss.logging.Logger;
 
 public class QuarkusBusFactory extends CXFBusFactory {
+
+    private static final Logger log = Logger.getLogger(QuarkusBusFactory.class);
 
     /** {@link List} of customizers passed via {@code RuntimeBusCustomizerBuildItem} */
     private static final List<Consumer<Bus>> customizers = new CopyOnWriteArrayList<>();
@@ -63,7 +66,10 @@ public class QuarkusBusFactory extends CXFBusFactory {
         @Override
         protected Class<?> findClass(String className, Class<?> callingClass) {
             try {
-                return Class.forName(className, true, Thread.currentThread().getContextClassLoader());
+                Class<?> result = Class.forName(className, true, Thread.currentThread().getContextClassLoader());
+                log.warn("==== findClass " + className + ": " + result + "@" + System.identityHashCode(result)
+                        + " cl " + result.getClassLoader());
+                return result;
             } catch (ClassNotFoundException e) {
                 throw new RuntimeException("Could not load " + className, e);
             }
