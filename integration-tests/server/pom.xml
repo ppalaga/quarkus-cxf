@@ -19,6 +19,11 @@
         </dependency>
 
         <dependency>
+            <groupId>org.l2x6.cli-assured</groupId>
+            <artifactId>mvn-assured</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>io.quarkiverse.cxf</groupId>
             <artifactId>quarkus-cxf-test-util</artifactId>
             <scope>test</scope>
