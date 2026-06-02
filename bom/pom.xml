@@ -503,6 +503,7 @@
                             <additionalBoms>
                                 <additionalBom>io.quarkus:quarkus-bom:${quarkus.version}</additionalBom>
                             </additionalBoms>
+                            <expand>true</expand>
                             <originExcludes>
                                 <!-- originExcludes should not be necessary, as we do not import any third party -->
                                 <!-- BOMs that would transitively import quarkus-bom. It is left there, because -->
