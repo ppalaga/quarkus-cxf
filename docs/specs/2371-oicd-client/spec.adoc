@@ -1,0 +1,112 @@
+# Quarkus OIDC Client integration for SOAP clients
+:toc:
+:toclevels: 2
+
+
+## Original requirements from https://github.com/quarkiverse/quarkus-cxf/issues/2371[#2371],
+
+Applications calling OAuth 2.0 / OIDC-protected SOAP services should be able to configure authentication declaratively,
+using Quarkus OIDC facilities without writing application-specific CXF interceptors for token management.
+The requested experience is comparable to REST client integration through `@OidcClientFilter` and `@AccessToken`.
+
+Quarkus CXF client proxies must set the HTTP `Authorization` header to `Bearer <access_token>`
+for the following scenarios:
+
+. *Client credentials*: acquire the token through a named Quarkus OIDC client and attach it to outbound SOAP calls.
+. *Access-token propagation*: forward the current caller's access token to the downstream SOAP service.
+. *RFC 8693 token exchange*: exchange the caller's token through a named or default Quarkus OIDC client,
+  then authenticate the SOAP call with the resulting token.
+
+The issue's follow-up acknowledges evaluation and adds no further requirements.
+
+## Existing capabilities and design context
+
+These observations explain why the open questions matter; they do not prescribe an implementation.
+
+* Quarkus CXF already supports a configured Bearer token through
+  `quarkus.cxf.client."client-name".auth.scheme` and `quarkus.cxf.client."client-name".auth.token`.
+  The requested integration adds token acquisition, lifecycle management, and selection of the current caller's token.
+* Quarkus OIDC Client provides asynchronous token APIs and a `TokenProvider` SPI.
+  Its token helpers and producers already implement caching, refresh, and reacquisition.
+  Exchange results can be cached separately for different additional grant parameters, including subject tokens.
+* Quarkus REST token propagation supports both RFC 8693 exchange and JWT-bearer exchange.
+* The Quarkus REST OIDC client filter's optional refresh-on-unauthorized behavior
+  replaces the token on the next invocation;
+  it does not replay the failed REST invocation.
+* CXF has its own authentication policies, authentication suppliers, redirects, and authorization retransmits.
+  It also retrieves WSDL documents separately from SOAP operation invocations.
+* Asynchronous CXF invocations made on an event-loop thread can be dispatched to a worker thread.
+  Propagation must account for access to the caller's identity across that transition.
+
+## Further design and scope decisions
+
+### Activation and configuration API
+
+* Enable OIDC for SOAP clients through configuration in application.properties only for now
+* This will allow using generated interfaces without modification
+* `@OidcClientFilter` and `@AccessToken` can be implemented later
+* The new config properties are
+  * `quarkus.cxf.client."client-name".oidc.mode` - one of `disabled` (default), `acquire`, `propagate`, `exchange`
+  * `quarkus.cxf.client."client-name".oidc.client-name` - the name of a configured Quarkus OIDC client (or Default OIDC client);
+    used only for acquisition or exchange.
+    * The client's `grant.type` must be compatible with `quarkus.cxf.client."client-name".oidc.mode`.
+      OIDC client with an incompatible grant is rejected on SOAP client creation.
+
+### Code organisation, target stream, native mode
+
+* The new OIDC functionality will be hosted in a new extension called `quarkus-cxf-oidc`
+* All three modes will be covered by `quarkus-cxf-oidc`
+* Only proxies injected with `@CXFClient` will be supported
+* Programmatic JAX-WS clients are out of scope for now
+* The new functionality is planned for Quarkus 4.0.
+* Support both JVM and native mode
+
+### Source and availability of the caller's access token
+
+* Obtain the token from the authenticated Quarkus security context for each invocation rather than from raw incoming HTTP header
+* The propagation will be tested for requests coming via SOAP and REST
+* When the caller is anonymous, the credential is absent or ambiguous
+  or there is no active request context (as in a scheduled job) then the SOAP client invocation must fail.
+
+### Token lifetime, caching, and concurrency
+
+* Reuse Quarkus token lifecycle support and its documented configuration where applicable.
+* Keep exchanged tokens isolated by subject token, selected OIDC client, and relevant grant parameters.
+* Explicitly document the effect of exchange caching on revocation detection.
+
+### Failures, timeouts, and downstream authorization failures
+
+* Fail before sending the SOAP request if the selected OIDC client cannot supply its a token required for the given authentication mode.
+* Do not automatically replay a SOAP operation after an authorization failure.
+* Any refresh-on-unauthorized option must distinguish replacing the token for a later invocation from retrying the current invocation.
+
+### Interaction with existing HTTP authentication and transport behavior
+
+* OIDC configuration and Basic or similar authentication on the same client results in failure on client creation
+* Bearer credentials should be resent or not resent on redirects according to the same criteria s Quarkus REST,
+  which is said to rely on underlying Vert.x redirect policy (https://vertx.io/docs/5.2.2/vertx-core/java/#_default_http_redirect_policy):
+  resend for same-origin redirects (same host, port and URI scheme), don't resend otherwise
+* The tokens must be masked in CXF message logging, diagnostics, and authentication errors
+
+### WSDL retrieval
+
+* The new OIDC functionality will cover the retrieval of WSDL documents only if `quarkus.cxf.client."client-name".secure-wsdl-access` is enabled.
+* WSDL loading must fail if caller token is required but not available.
+* Imported documents or WSDL redirects to a different origin won't get the Authorization header
+
+### Acceptance criteria
+
+* Only VertxHttpClientHTTPConduit is supported.
+* Cover iby tests:
+  * Synchronous and asynchronous SOAP client calls
+  * All three OIDC modes
+  * Named and default OIDC clients
+  * Token reuse, expiry, refresh, and reacquisition.
+  * Missing caller credentials
+  * Invalid configuration
+  * Token-endpoint failures
+  * Redirects
+  * WSDL access
+  * SOAP client auth Configuration conflicts (Basic and OIDC)
+  * Concurrent calls with different callers must demonstrate that tokens do not cross between identities.
+  * Use intergration tests as examples in the documentation for each mode.
