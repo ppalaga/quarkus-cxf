@@ -18,6 +18,16 @@
             <artifactId>quarkus-cxf</artifactId>
         </dependency>
         <dependency>
+            <groupId>io.quarkiverse.cxf</groupId>
+            <artifactId>quarkus-cxf-oidc</artifactId>
+            <!-- The implementation is being developed separately (issue #2371). -->
+            <version>${quarkus-cxf.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-oidc-client</artifactId>
+        </dependency>
+        <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-oidc</artifactId>
         </dependency>
@@ -34,6 +44,21 @@
         <dependency>
             <groupId>io.rest-assured</groupId>
             <artifactId>rest-assured</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-junit-internal</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.smallrye.certs</groupId>
+            <artifactId>smallrye-certificate-generator</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -77,6 +102,8 @@
                                     <directory>src/main/java/io/quarkiverse/cxf/it/auth/oidc</directory>
                                     <includes>
                                         <include>HelloServiceImpl.java</include>
+                                        <include>client/OidcClientResource.java</include>
+                                        <include>client/OidcClients.java</include>
                                     </includes>
                                 </resource>
                             </resources>
@@ -130,6 +157,19 @@
                 <dependency>
                     <groupId>io.quarkiverse.cxf</groupId>
                     <artifactId>quarkus-cxf-deployment</artifactId>
+                    <version>${project.version}</version>
+                    <type>pom</type>
+                    <scope>test</scope>
+                    <exclusions>
+                        <exclusion>
+                            <groupId>*</groupId>
+                            <artifactId>*</artifactId>
+                        </exclusion>
+                    </exclusions>
+                </dependency>
+                <dependency>
+                    <groupId>io.quarkiverse.cxf</groupId>
+                    <artifactId>quarkus-cxf-oidc-deployment</artifactId>
                     <version>${project.version}</version>
                     <type>pom</type>
                     <scope>test</scope>
