@@ -1,0 +1,16 @@
+---
+artifact: ${project.groupId}:${project.artifactId}:${project.version}
+name: "Quarkus CXF OIDC"
+metadata:
+  keywords:
+    - "soap"
+    - "cxf"
+    - "services"
+  categories:
+    - "integration"
+  guide: "https://quarkiverse.github.io/quarkiverse-docs/quarkus-cxf/dev/reference/extensions/quarkus-cxf-oidc.html"
+  status: "stable"
+  integrates:
+    - name: "Apache CXF"
+      artifact: "org.apache.cxf:cxf-core"
+      version: "${cxf.version}"

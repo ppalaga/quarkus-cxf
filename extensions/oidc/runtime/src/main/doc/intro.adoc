@@ -1,0 +1,3 @@
+Authenticate injected SOAP clients using Quarkus OIDC Client.
+Acquire client-credentials tokens, propagate the current caller's access token,
+or exchange it using RFC 8693 without changing generated service interfaces.
