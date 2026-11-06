@@ -4,6 +4,7 @@ import static java.util.stream.Collectors.toList;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,8 +20,6 @@ import jakarta.enterprise.inject.spi.InjectionPoint;
 import jakarta.inject.Inject;
 import jakarta.xml.ws.BindingProvider;
 
-import org.apache.cxf.Bus;
-import org.apache.cxf.BusFactory;
 import org.apache.cxf.annotations.SchemaValidation.SchemaValidationType;
 import org.apache.cxf.configuration.security.AuthorizationPolicy;
 import org.apache.cxf.endpoint.Client;
@@ -198,7 +197,6 @@ public abstract class CxfClientProducer {
         loggingFactoryCustomizer.customize(cxfClientInfo, factory);
         customizers.forEach(customizer -> customizer.customize(cxfClientInfo, factory));
 
-        final Bus bus = BusFactory.getDefaultBus();
         final QuarkusHTTPConduitFactory conduitFactory = new QuarkusHTTPConduitFactory(
                 fixedConfig,
                 cxfClientInfo,
@@ -207,20 +205,21 @@ public abstract class CxfClientProducer {
                 httpClientPool);
         props.put(HTTPConduitFactory.class.getName(), conduitFactory);
         Object result;
-        final HTTPConduitFactory origConduitFactory = bus.getExtension(HTTPConduitFactory.class);
-        try {
-            /*
-             * Workaround for https://github.com/quarkiverse/quarkus-cxf/issues/1264
-             * We set the client specific HTTPConduitFactory on the bus temporarily,
-             * so that it is honored for getting the WSDL.
-             * We assume that no other tread is accessing the HTTPConduitFactory.class extension in parallel
-             */
-            bus.setExtension(conduitFactory, HTTPConduitFactory.class);
-
+        final ClientRequestAuthentication authentication = (ClientRequestAuthentication) props
+                .get(ClientRequestAuthentication.KEY);
+        final String wsdlUrl = cxfClientInfo.getWsdlUrl();
+        final ClientRequestAuthentication.Request wsdlAuthentication = authentication != null
+                && cxfClientInfo.isSecureWsdlAccess() && wsdlUrl != null
+                && (wsdlUrl.startsWith("http:") || wsdlUrl.startsWith("https:"))
+                        ? new ClientRequestAuthentication.Request(authentication, URI.create(wsdlUrl.replace(" ", "%20")))
+                        : null;
+        try (ClientCreationContext ignored = new ClientCreationContext(conduitFactory, wsdlAuthentication)) {
+            // Resolve a required caller even when the WSDL manager has a cached definition.
+            if (wsdlAuthentication != null) {
+                wsdlAuthentication.authorization().toCompletableFuture().join();
+            }
             LOGGER.debug("cxf client loaded for " + sei);
             result = factory.create();
-        } finally {
-            bus.setExtension(origConduitFactory, HTTPConduitFactory.class);
         }
 
         final Client client = ClientProxy.getClient(result);

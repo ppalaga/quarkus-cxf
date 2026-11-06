@@ -40,6 +40,124 @@ unless you set the `xref:reference/extensions/quarkus-cxf.adoc[quarkus.cxf.clien
 include::example$client-server/application.properties[tag=client-basic-auth-wsdl]
 ----
 
+[[client-oidc]]
+== OIDC authentication for SOAP clients
+
+Add `io.quarkiverse.cxf:quarkus-cxf-oidc` to use Quarkus OIDC Client for outbound SOAP authentication.
+The extension supports injected `@CXFClient` proxies using `VertxHttpClientHTTPConduitFactory`,
+including generated synchronous and asynchronous interfaces, in JVM and native applications.
+It does not add authentication to programmatic JAX-WS clients.
+Without `oidc.mode`, or with `oidc.mode = disabled`, existing authentication remains unchanged.
+
+The following examples are included from the OIDC integration tests.
+Their local provider and SOAP recorder replace `${oidc.fixture.http}` at test startup and enable the named OIDC clients.
+In your application, use your provider's token endpoint, client credentials, generated service interface, and SOAP URL.
+Acquisition requires `quarkus-oidc-client` configuration,
+but does not require an inbound OIDC provider or caller identity.
+
+=== Acquire a client-credentials token
+
+Configure a Quarkus OIDC client with `grant.type = client` and select it with `oidc.client-name`:
+
+[source,properties]
+----
+include::example$oidc/application.properties[lines=165..174]
+include::example$oidc/application.properties[lines=237..243]
+----
+
+The test fixture enables `quarkus.oidc-client.named.client-enabled` at runtime.
+Omitting `oidc.client-name` selects the default Quarkus OIDC client instead.
+The SOAP request carries the access token obtained for that client.
+
+=== Propagate the caller's access token
+
+[source,properties]
+----
+include::example$oidc/application.properties[lines=246..251]
+----
+
+The extension reads the authenticated Quarkus security identity for each invocation,
+including calls entering through REST or SOAP and async calls dispatched from the event loop to a worker.
+It does not read the incoming HTTP Authorization header directly.
+Anonymous callers, identities without exactly one bearer access-token credential,
+and calls without an active request context fail before sending SOAP.
+No OIDC client is needed for propagation; `oidc.client-name` is ignored in this mode.
+
+=== Exchange the caller's token
+
+[source,properties]
+----
+include::example$oidc/application.properties[lines=81..90]
+include::example$oidc/application.properties[lines=224..224]
+include::example$oidc/application.properties[lines=254..260]
+----
+
+The test fixture enables `quarkus.oidc-client.exchange.client-enabled` at runtime.
+Configure the selected Quarkus OIDC client with `grant.type = exchange`.
+The extension sends the current caller's access token as the RFC 8693 `subject_token`
+and authenticates SOAP with the resulting access token.
+Named and default OIDC clients are supported.
+An incompatible grant or unavailable selected OIDC client is rejected when the SOAP client is created.
+
+The integration application injects generated clients with configuration-only activation:
+
+[source,java]
+----
+include::example$oidc/client/OidcClients.java[lines=27..34]
+----
+
+The same generated interfaces offer callback operations, adapted to Mutiny for nonblocking REST ingress:
+
+[source,java]
+----
+include::example$oidc/client/OidcClientResource.java[lines=71..90]
+----
+
+=== Token lifecycle and revocation
+
+Quarkus owns token reuse, expiry checks, refresh, reacquisition, connection timeouts, and token-endpoint retries.
+Acquisition uses its token producer, including `early-tokens-acquisition` and `refresh-interval` where configured.
+Exchange uses its parameter-keyed `TokensHelper` cache and is lazy because a subject token is required.
+For exchange, early acquisition and background `refresh-interval` are not applied;
+refresh or reacquisition takes place during an invocation with that caller's parameters.
+
+The applicable settings include `refresh-token-time-skew`, `access-token-expiry-skew`,
+`token-cache-max-size`, `connection-timeout`, and `connection-retry-count` under the selected `quarkus.oidc-client`.
+Exchange results and outstanding requests are separated by selected client and the exact subject-token value,
+including two different tokens with the same subject claim, and by additional grant parameters.
+Configured audience, scope, and grant options belong to the selected OIDC client.
+The SOAP configuration does not add an API for per-invocation audience or scope overrides.
+
+Reusing an exchanged token does not contact the issuer to revalidate its subject token on every SOAP call.
+Revoking the subject token may therefore not be detected until a later exchange;
+the downstream service may enforce its own validation of the exchanged token.
+Setting `token-cache-max-size = 0` disables reuse for parameterized exchanges,
+but does not create any additional revocation guarantee.
+
+Token-supply failures prevent SOAP dispatch.
+A downstream 401 or 403 fails the operation without automatic replay.
+This extension does not provide a refresh-on-unauthorized option.
+Do not configure Basic, Digest, or static Bearer authentication alongside an enabled OIDC mode.
+A non-Vert.x conduit is rejected at client creation rather than silently replaced.
+
+=== Redirects and WSDL access
+
+SOAP redirects retain the Bearer credential only within the same origin: scheme, host, and effective port.
+Default HTTP/HTTPS ports are normalized.
+Once a redirect leaves the original origin, credentials remain suppressed for the rest of that redirect chain.
+Existing redirect enablement and limits still apply.
+Authorization values are masked in CXF logging and token-provider errors are sanitized.
+
+Remote WSDL loading uses OIDC only when `quarkus.cxf.client."client-name".secure-wsdl-access = true`.
+When enabled, propagation and exchange require a caller during client creation,
+so eager or contextless creation of such a client fails.
+Root documents and same-origin imports can authenticate;
+cross-origin imports and redirect targets receive no credential.
+Authenticated WSDL definitions are loaded separately for each proxy creation
+rather than shared across caller identities.
+With secure WSDL access disabled, fetching a public WSDL does not require a caller,
+but subsequent caller-dependent SOAP operations still do.
+
 == Mutual TLS (mTLS) authentication
 
 See the xref:user-guide/ssl-tls-https.adoc[Mutual TLS (mTLS) authentication] section in SSL, TLS and HTTPS guide.
@@ -85,7 +203,7 @@ configures a service application and publishes a SOAP endpoint at `/services/hel
 .application.properties
 [source,properties]
 ----
-include::example$oidc/application.properties[]
+include::example$oidc/application.properties[lines=1..15]
 ----
 
 The example uses Keycloak Dev Services, which requires Docker or Podman.

@@ -171,7 +171,17 @@ public class OidcClients {
     public synchronized OidcEcho fresh(String name) {
         // T-019--T-022 must actually fetch the WSDL, including after a valid caller warmed another proxy.
         ConfigProvider.getConfig().getOptionalValue("quarkus.cxf.client." + name + ".wsdl", String.class)
-                .ifPresent(wsdl -> BusFactory.getDefaultBus().getExtension(WSDLManager.class).removeDefinition(wsdl));
+                .ifPresent(wsdl -> {
+                    WSDLManager manager = BusFactory.getDefaultBus().getExtension(WSDLManager.class);
+                    // CXF 4.2.4's CacheMap may retain identity aliases after removeDefinition(String).
+                    // Use the value overload without creating another alias, until this URL is actually cold.
+                    manager.getDefinitions().entrySet().stream().filter(entry -> wsdl.equals(entry.getKey()))
+                            .map(Map.Entry::getValue).findFirst().ifPresent(definition -> {
+                                do {
+                                    manager.removeDefinition(definition);
+                                } while (manager.getDefinitions().containsKey(wsdl));
+                            });
+                });
         return supplier(name).get();
     }
 

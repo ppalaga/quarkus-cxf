@@ -21,6 +21,7 @@ import org.apache.cxf.transport.http.HTTPTransportFactory;
 import org.apache.cxf.wsdl11.WSDLEndpointFactory;
 import org.jboss.logging.Logger;
 
+import io.quarkiverse.cxf.ClientCreationContext;
 import io.quarkiverse.cxf.URLConnectionHTTPConduitFactory;
 
 public class VertxDestinationFactory extends HTTPTransportFactory implements WSDLEndpointFactory {
@@ -82,6 +83,10 @@ public class VertxDestinationFactory extends HTTPTransportFactory implements WSD
     @Override
     protected HTTPConduitFactory findFactory(EndpointInfo endpointInfo, Bus bus) {
         HTTPConduitFactory f = endpointInfo.getProperty(HTTPConduitFactory.class.getName(), HTTPConduitFactory.class);
+        if (f == null && ClientCreationContext.current() != null) {
+            // Includes CXF's separate schema resolver, which creates its own endpoint for each import.
+            f = ClientCreationContext.current().conduitFactory();
+        }
         if (f == null) {
             f = bus.getExtension(HTTPConduitFactory.class);
         }

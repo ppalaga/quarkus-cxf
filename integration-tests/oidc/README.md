@@ -2,8 +2,7 @@
 
 These tests implement the scenarios in
 [the issue 2371 test plan](../../docs/specs/i2371-oicd-client/test-plan.md).
-They require the forthcoming `quarkus-cxf-oidc` extension.
-The test generation task did not run them.
+They use the `quarkus-cxf-oidc` extension.
 All new test methods carry `@Tag("T-nnn")`; parameterized invocations also display the scenario ID.
 
 `OidcTestResource` runs an external, controllable OIDC provider, SOAP recorder, and HTTP/HTTPS document servers.
@@ -34,16 +33,16 @@ The generated interface is also configured explicitly so no runtime WSDL is need
 | T-004 | `OidcModesTest`, `OidcDefaultExchangeTest`: named/default RFC 8693 exchange |
 | T-005 | `OidcCredentialsTest`: security identity wins over raw headers; absent and ambiguous credentials fail |
 | T-006 | `OidcCredentialsTest`: warmed proxies, anonymous requests, and contextless sync/async invocations |
-| T-007 | `OidcInvalidModeTest`: invalid configuration; incompatible grant candidates await Q-1 |
+| T-007 | Extension deployment tests: invalid modes, incompatible grants, unknown clients |
 | T-008 | `OidcConfigurationTest`: Basic/Digest conflicts in every enabled mode, before invocation |
-| T-009 | `OidcModesTest`: inspect the effective conduit; unsupported-conduit outcome awaits Q-4 |
+| T-009 | `OidcModesTest`: effective conduit; extension deployment tests reject unsupported conduits |
 | T-010 | `OidcTokenLifecycleTest`, `OidcDefaultExchangeLifecycleTest`: reuse and expiry/reacquisition |
 | T-011 | `OidcTokenLifecycleTest`: refresh replacement and failure with no successful fallback |
 | T-012 | `OidcIsolationTest`: subject-token and selected-client isolation, configured audiences |
 | T-013 | `OidcIsolationTest`: overlapping SOAP/REST sync/async calls, reversed completion, warm caches |
 | T-014 | `OidcTokenFailureTest`: OAuth errors, 5xx, malformed/tokenless replies, refusal, timeout |
 | T-015 | `OidcAuthorizationFailureTest`: 401 with/without challenge and 403 never replay operations |
-| T-016 | `OidcRedirectTest`: same origin, host-only and port-only changes; scheme-only boundary remains pending |
+| T-016 | `OidcRedirectTest` and extension `OidcOriginTest`: live redirects, scheme-only changes, default ports |
 | T-017 | `OidcRedirectTest`: all modes and sync/async redirects, including both HTTP/HTTPS directions |
 | T-018 | `OidcLoggingTest`, `OidcPerClientLoggingTest`: logged traffic and diagnostic/cause-chain masking |
 | T-019 | `OidcWsdlTest`: omitted/false secure WSDL gate, including anonymous creation |
@@ -51,28 +50,42 @@ The generated interface is also configured explicitly so no runtime WSDL is need
 | T-021 | `OidcWsdlTest`: missing credentials fail during fresh WSDL creation, before an operation |
 | T-022 | `OidcWsdlOriginTest`: cross-origin WSDL redirects and WSDL/XSD imports |
 | T-023 | `OidcIsolationTest`: event-loop entry, worker dispatch, held grants, identity isolation, failures |
-| T-024 | Pending Q-8; mandatory no-replay assertions are enabled in T-015 |
-| T-025 | Antora source copying is configured; documentation build and prose review remain pending |
+| T-024 | Not applicable: no optional unauthorized-refresh policy; mandatory no-replay assertions are enabled in T-015 |
+| T-025 | Antora source copying and rendered examples; see implementation notes for documentation validation |
 | T-026 | Matching `*IT` subclasses inherit application cases and add the T-026 tag |
 
 The module already appears in the reactor and native CI matrix.
-`OidcInvalidModeTest` uses a separate `QuarkusExtensionTest` archive because invalid configuration cannot start
-an HTTP-driven application.
+`OidcInvalidModeTest` lives in `extensions/oidc/deployment` because invalid configuration cannot start
+an HTTP-driven application, and Quarkus rejects mixing the two test frameworks in one test run.
 It has no native counterpart.
 
-The following expectations intentionally remain disabled and explain their dependency in `@Disabled`:
+The original pending placeholders remain disabled.
+Their current status is:
 
-- Q-1: the exact incompatible-grant matrix, represented by candidate creation tests in `OidcConfigurationTest`.
-- Q-4: whether explicit URLConnection selection is rejected, and at which phase, or replaced with Vert.x.
+- Q-1/Q-4: grant compatibility and creation-time transport rejection are covered by extension deployment tests.
 - Q-5: varying only an additional exchange parameter while keeping the subject token and selected client fixed.
   The enabled audience test changes the configured OIDC client too, so it does not claim that independent dimension.
-- T-016: testing a scheme-only origin change at an identical port through the implementation's actual origin decision.
-  The HTTP/HTTPS integration fixtures use separate listening ports.
-- Q-8: whether an optional unauthorized-refresh policy exists and how to configure it.
-- T-025: the documentation build and human review of exchange-cache/revocation semantics after implementation.
+- T-016: `OidcOriginTest` exercises the implementation's origin decision at an identical port.
+- Q-8: no optional unauthorized-refresh policy is provided.
+- T-025: documentation rendering is checked separately from the application tests.
 
-`OidcPendingContractTest` keeps these outstanding items visible rather than treating them as passing coverage.
+`OidcPendingContractTest` does not count as passing application coverage.
 The enabled lifecycle tests use the Quarkus 4.0.0.Beta2 settings `token-cache-max-size`,
 `early-tokens-acquisition`, `refresh-token-time-skew`, `connection-timeout`, and `connection-retry-count`.
 They do not prescribe refresh behavior for exchange, exact concurrent grant counts, default-port normalization,
 redirect chains that return to the original origin, or the timing of a failed unauthenticated WSDL GET.
+
+Run the outbound fixture suite after installing the extension and BOM:
+
+```bash
+mvnd -f integration-tests/oidc/pom.xml clean test '-Dtest=Oidc*Test' \
+  -Dquarkus.keycloak.devservices.enabled=false
+mvnd -f extensions/oidc/deployment/pom.xml test \
+  -Dtest=OidcConfigurationTest,OidcInvalidModeTest,OidcOriginTest,OidcRedactionTest
+```
+
+The local resources supply OIDC provider URLs after Dev Services initialization, so disable Keycloak Dev Services
+for these outbound tests.
+The separate `HelloServiceTest` still uses Keycloak.
+See [implementation notes](../../docs/specs/i2371-oicd-client/implementation-notes.md)
+for evidence supporting fixture corrections and validation results.

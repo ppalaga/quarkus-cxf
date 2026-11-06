@@ -38,11 +38,15 @@ import org.apache.cxf.transport.ConduitInitiator;
 import org.apache.cxf.transport.ConduitInitiatorManager;
 import org.apache.cxf.transport.MessageObserver;
 import org.apache.cxf.transport.TransportURIResolver;
+import org.apache.cxf.transport.http.HTTPConduitFactory;
 import org.apache.cxf.wsdl11.CatalogWSDLLocator;
 import org.apache.cxf.wsdl11.ResourceManagerWSDLLocator;
 import org.apache.cxf.wsdl11.WSDLManagerImpl;
 import org.w3c.dom.Document;
 import org.xml.sax.InputSource;
+
+import io.quarkiverse.cxf.ClientCreationContext;
+import io.quarkiverse.cxf.ClientRequestAuthentication;
 
 /**
  * Temporary workaround for https://github.com/quarkiverse/quarkus-cxf/issues/1608
@@ -85,6 +89,17 @@ public class QuarkusWSDLManager extends WSDLManagerImpl {
         } catch (IllegalArgumentException | IllegalAccessException | NoSuchFieldException | SecurityException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @SuppressWarnings({ "removal", "deprecation" })
+    @Override
+    public Definition getDefinition(String url) throws WSDLException {
+        ClientCreationContext creation = ClientCreationContext.current();
+        if (creation != null && creation.authentication() != null) {
+            // A provider may serve different documents at the same URL to different authenticated callers.
+            return loadDefinition(url);
+        }
+        return super.getDefinition(url);
     }
 
     @SuppressWarnings({ "removal", "deprecation" })
@@ -233,6 +248,10 @@ public class QuarkusWSDLManager extends WSDLManagerImpl {
                         // set the endpointInfo name which could be used for configuration
                         info.setName(new QName("http://cxf.apache.org", "TransportURIResolver"));
                         info.setAddress(base.toString());
+                        ClientCreationContext creation = ClientCreationContext.current();
+                        if (creation != null) {
+                            info.setProperty(HTTPConduitFactory.class.getName(), creation.conduitFactory());
+                        }
                         Conduit c = ci.getConduit(info, bus);
                         Message message = new MessageImpl();
                         Exchange exch = new ExchangeImpl();
@@ -240,6 +259,9 @@ public class QuarkusWSDLManager extends WSDLManagerImpl {
                         message.setExchange(exch);
 
                         message.put(Message.HTTP_REQUEST_METHOD, "GET");
+                        if (creation != null && creation.authentication() != null) {
+                            message.put(ClientRequestAuthentication.Request.class, creation.authentication());
+                        }
                         c.setMessageObserver(new MessageObserver() {
                             @Override
                             public void onMessage(Message message) {

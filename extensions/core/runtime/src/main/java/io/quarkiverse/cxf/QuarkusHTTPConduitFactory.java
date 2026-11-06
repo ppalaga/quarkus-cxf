@@ -60,15 +60,15 @@ public class QuarkusHTTPConduitFactory implements HTTPConduitFactory {
     @Override
     public HTTPConduit createConduit(HTTPTransportFactory f, Bus b, EndpointInfo localInfo, EndpointReferenceType target)
             throws IOException {
-        HTTPConduitSpec httpConduitImpl = cxfClientInfo.getHttpConduitImpl();
-        if (httpConduitImpl == null) {
-            httpConduitImpl = cxFixedConfig.httpConduitFactory().orElse(null);
-        }
+        return configure(resolve(cxfClientInfo, cxFixedConfig), cxfClientInfo, b, localInfo, target);
+    }
 
-        if (httpConduitImpl == null) {
-            httpConduitImpl = HTTPConduitImpl.QuarkusCXFDefault;
+    public static HTTPConduitSpec resolve(CXFClientInfo info, CxfFixedConfig config) {
+        HTTPConduitSpec conduit = info.getHttpConduitImpl();
+        if (conduit == null) {
+            conduit = config.httpConduitFactory().orElse(HTTPConduitImpl.QuarkusCXFDefault);
         }
-        return configure(httpConduitImpl.resolveDefault(), cxfClientInfo, b, localInfo, target);
+        return conduit.resolveDefault();
     }
 
     private HTTPConduit configure(HTTPConduitSpec httpConduitImpl, CXFClientInfo cxfClientInfo, Bus b,

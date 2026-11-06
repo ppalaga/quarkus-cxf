@@ -2,6 +2,7 @@ package io.quarkiverse.cxf;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.net.URI;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -58,7 +59,8 @@ public class QuarkusJaxWsProxyFactoryBean extends JaxWsProxyFactoryBean {
 
     @Override
     protected ClientProxy clientClientProxy(Client c) {
-        return new QuarkusJaxWsClientProxy(vertx, (JaxWsClientProxy) super.clientClientProxy(c), workerDispatchTimeout);
+        return new QuarkusJaxWsClientProxy(vertx, (JaxWsClientProxy) super.clientClientProxy(c), workerDispatchTimeout,
+                (ClientRequestAuthentication) getProperties().get(ClientRequestAuthentication.KEY), getServiceClass());
     }
 
     public static class QuarkusJaxWsClientProxy extends ClientProxy implements BindingProvider {
@@ -66,9 +68,18 @@ public class QuarkusJaxWsProxyFactoryBean extends JaxWsProxyFactoryBean {
         private final JaxWsClientProxy delegate;
         private final Vertx vertx;
         private final long workerDispatchTimeout;
+        private final ClientRequestAuthentication authentication;
+        private final Class<?> serviceClass;
 
         public QuarkusJaxWsClientProxy(Vertx vertx, JaxWsClientProxy delegate, long workerDispatchTimeout) {
+            this(vertx, delegate, workerDispatchTimeout, null, null);
+        }
+
+        QuarkusJaxWsClientProxy(Vertx vertx, JaxWsClientProxy delegate, long workerDispatchTimeout,
+                ClientRequestAuthentication authentication, Class<?> serviceClass) {
             super(delegate.getClient());
+            this.authentication = authentication;
+            this.serviceClass = serviceClass;
             this.vertx = vertx;
             this.delegate = delegate;
             this.workerDispatchTimeout = workerDispatchTimeout;
@@ -76,6 +87,15 @@ public class QuarkusJaxWsProxyFactoryBean extends JaxWsProxyFactoryBean {
 
         @Override
         public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+            final ClientRequestAuthentication.Request request;
+            if (authentication != null && method.getDeclaringClass() != Object.class
+                    && method.getDeclaringClass().isAssignableFrom(serviceClass)) {
+                String address = (String) delegate.getRequestContext().getOrDefault(BindingProvider.ENDPOINT_ADDRESS_PROPERTY,
+                        delegate.getClient().getEndpoint().getEndpointInfo().getAddress());
+                request = new ClientRequestAuthentication.Request(authentication, URI.create(address));
+            } else {
+                request = null;
+            }
             final boolean isAsync = isAsync(method);
             if (isAsync && !BlockingOperationControl.isBlockingAllowed()) {
                 /* We are returning a Future and we are on Vert.x event loop thread */
@@ -152,7 +172,7 @@ public class QuarkusJaxWsProxyFactoryBean extends JaxWsProxyFactoryBean {
                             }
                         }
                         try {
-                            delegate.invoke(proxy, method, newArgs);
+                            invokeWithAuthentication(proxy, method, newArgs, request);
                             return null;
                         } catch (InterruptedException e) {
                             Thread.currentThread().interrupt();
@@ -168,8 +188,14 @@ public class QuarkusJaxWsProxyFactoryBean extends JaxWsProxyFactoryBean {
                 });
                 return new QuarkusJaxWsResponse<Object>(result);
             }
-            return delegate.invoke(proxy, method, args);
+            return invokeWithAuthentication(proxy, method, args, request);
+        }
 
+        private Object invokeWithAuthentication(Object proxy, Method method, Object[] args,
+                ClientRequestAuthentication.Request request) throws Throwable {
+            try (ClientRequestAuthentication.Scope ignored = new ClientRequestAuthentication.Scope(request)) {
+                return delegate.invoke(proxy, method, args);
+            }
         }
 
         boolean isAsync(Method m) {

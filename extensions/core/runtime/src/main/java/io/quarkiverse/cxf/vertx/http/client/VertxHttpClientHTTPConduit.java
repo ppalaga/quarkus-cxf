@@ -76,6 +76,8 @@ import org.eclipse.microprofile.context.ManagedExecutor;
 import org.jboss.logging.Logger;
 
 import io.quarkiverse.cxf.CXFClientInfo;
+import io.quarkiverse.cxf.ClientCreationContext;
+import io.quarkiverse.cxf.ClientRequestAuthentication;
 import io.quarkiverse.cxf.QuarkusCxfUtils;
 import io.quarkiverse.cxf.QuarkusTLSClientParameters;
 import io.quarkiverse.cxf.vertx.http.client.BodyRecorder.BodyWriter;
@@ -137,6 +139,23 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
     @Override
     protected void setupConnection(Message message, Address address, HTTPClientPolicy csPolicy) throws IOException {
         final RequestOptions requestOptions = new RequestOptions();
+        if (message.get(ClientRequestAuthentication.Request.class) == null) {
+            ClientCreationContext creation = ClientCreationContext.current();
+            if (creation != null && "GET".equals(message.get(Message.HTTP_REQUEST_METHOD))) {
+                // WSDL loading has its own gate, even when a proxy is created inside another invocation.
+                if (creation.authentication() != null) {
+                    message.put(ClientRequestAuthentication.Request.class, creation.authentication());
+                }
+            } else if (ClientRequestAuthentication.Scope.current() != null) {
+                message.put(ClientRequestAuthentication.Request.class, ClientRequestAuthentication.Scope.current());
+            }
+        }
+        final ClientRequestAuthentication.Request authentication = message.get(ClientRequestAuthentication.Request.class);
+        if (authentication != null) {
+            // The actual credential is only placed on the transport request after asynchronous authentication.
+            // Message logging and diagnostics see only this placeholder, including while token acquisition is pending.
+            new Headers(message).setAuthorization("Bearer ***");
+        }
 
         final URI uri = address.getURI();
         final String scheme = uri.getScheme();
@@ -163,7 +182,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
         final HttpVersion version = getVersion(message, csPolicy);
         final boolean isHttps = "https".equals(uri.getScheme());
         final QuarkusTLSClientParameters clientParameters;
-        if (isHttps) {
+        if (isHttps || authentication != null) {
             clientParameters = findTLSClientParameters(message);
             validateClientParameters(clientParameters);
             final List<MessageTrustDecider> trustDeciders;
@@ -189,6 +208,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                 : uri.getPath();
         requestOptions
                 .setMethod(method)
+                .setSsl(isHttps)
                 .setHost(uri.getHost())
                 .setURI(pathAndQuery)
                 .setConnectTimeout(determineConnectionTimeout(message, csPolicy));
@@ -454,6 +474,8 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
         private final ContextInternal context;
         private final AuthorizationPolicy authorizationPolicy;
         private final HttpAuthSupplier authSupplier;
+        private final ClientRequestAuthentication.Request authentication;
+        private boolean credentialsSuppressed;
 
         /* Read an written only from the producer thread */
         private boolean firstEvent = true;
@@ -506,6 +528,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
             this.context = context;
             this.clientInfo = clientInfo;
             this.outMessage = outMessage;
+            this.authentication = outMessage.get(ClientRequestAuthentication.Request.class);
             this.url = url;
             this.cookies = cookies;
             this.userAgent = userAgent;
@@ -558,7 +581,21 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
 
                 setProtocolHeaders(outMessage, requestOptions, userAgent, version);
 
-                client.request(requestOptions)
+                final Future<Void> authenticated;
+                if (authentication == null) {
+                    authenticated = Future.succeededFuture();
+                } else {
+                    authenticated = Future.fromCompletionStage(authentication.authorization(), context).map(header -> {
+                        requestOptions.removeHeader("Authorization");
+                        if (authentication.allows(url)) {
+                            requestOptions.putHeader("Authorization", header);
+                        } else {
+                            credentialsSuppressed = true;
+                        }
+                        return null;
+                    });
+                }
+                authenticated.compose(ignored -> client.request(requestOptions))
                         .onSuccess(req -> {
                             mode.timeoutSpec.connected();
                             if (!finalChunk) {
@@ -653,7 +690,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                             /* need to retransmit? */
                             final int statusCode = response.statusCode();
                             final boolean isRedirect = isRedirect(statusCode);
-                            final boolean isAuthRetransmit = statusCode == 401 || statusCode == 407;
+                            final boolean isAuthRetransmit = authentication == null && (statusCode == 401 || statusCode == 407);
                             if (possibleRetransmit
                                     && (isRedirect || isAuthRetransmit)
                                     && (maxRetransmits < 0 || performedRetransmits(redirects) < maxRetransmits)) {
@@ -748,7 +785,13 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                 detectRedirectLoop(configKey, redirects, newUri, outMessage);
                 redirects.add(newUri);
                 checkAllowedRedirectUri(configKey, previousUri, newUri, outMessage);
-                retransmit(newUri, Function.identity());
+                retransmit(newUri, options -> {
+                    if (authentication != null && (credentialsSuppressed || !authentication.allows(newUri))) {
+                        credentialsSuppressed = true;
+                        options.removeHeader("Authorization");
+                    }
+                    return options;
+                });
             } catch (URISyntaxException e) {
                 throw new IOException(
                         "Could not resolve redirect Location " + loc + " relative to " + url, e);
