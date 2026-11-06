@@ -18,6 +18,7 @@
         <module>woodstox</module>
         <module>rt-management</module>
         <module>core</module>
+        <module>oidc</module>
         <module>features-metrics</module>
         <module>integration-tracing-opentelemetry</module>
         <module>ws-security</module>

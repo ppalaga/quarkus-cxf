@@ -1,0 +1,6 @@
+See xref:user-guide/authentication-authorization.adoc#client-oidc[OIDC authentication for SOAP clients]
+for tested examples, token lifecycle settings, and WSDL access.
+
+This extension supports `@CXFClient` proxies using `VertxHttpClientHTTPConduitFactory` in JVM and native applications.
+OIDC is disabled by default.
+Programmatic JAX-WS clients and other HTTP conduits are outside this integration's scope.

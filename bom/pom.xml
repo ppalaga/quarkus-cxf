@@ -105,6 +105,16 @@
             </dependency>
             <dependency>
                 <groupId>io.quarkiverse.cxf</groupId>
+                <artifactId>quarkus-cxf-oidc</artifactId>
+                <version>${quarkus-cxf.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.quarkiverse.cxf</groupId>
+                <artifactId>quarkus-cxf-oidc-deployment</artifactId>
+                <version>${quarkus-cxf.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.quarkiverse.cxf</groupId>
                 <artifactId>quarkus-cxf-rt-features-metrics</artifactId>
                 <version>${quarkus-cxf.version}</version>
             </dependency>
