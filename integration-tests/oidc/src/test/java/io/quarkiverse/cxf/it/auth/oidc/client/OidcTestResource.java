@@ -262,8 +262,16 @@ public class OidcTestResource implements QuarkusTestResourceLifecycleManager {
         soap.add(record); // Count receipt before authentication, redirects, or deliberately unsuccessful responses.
         JsonObject rule = soapRules.getOrDefault(id, new JsonObject());
         boolean destination = request.request().path().startsWith("/destination/");
+        JsonArray redirectChain = rule.getJsonArray("redirectChain");
+        int redirectIndex = (int) soap.stream().map(JsonObject.class::cast)
+                .filter(receipt -> id.equals(receipt.getString("id"))).count() - 1;
         Runnable reply = () -> {
-            if (!destination && rule.containsKey("redirect")) {
+            if (redirectChain != null && redirectIndex < redirectChain.size()) {
+                request.response().setStatusCode(307)
+                        .putHeader("Location", target(redirectChain.getString(redirectIndex))
+                                + "/destination/" + id + "/hop-" + redirectIndex)
+                        .end();
+            } else if (!destination && rule.containsKey("redirect")) {
                 request.response().setStatusCode(307).putHeader("Location", target(rule.getString("redirect"))
                         + "/destination/" + id).end();
             } else if (rule.containsKey("status")) {

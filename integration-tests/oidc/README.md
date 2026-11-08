@@ -43,7 +43,7 @@ The generated interface is also configured explicitly so no runtime WSDL is need
 | T-013 | `OidcIsolationTest`: overlapping SOAP/REST sync/async calls, reversed completion, warm caches |
 | T-014 | `OidcTokenFailureTest`: OAuth errors, 5xx, malformed/tokenless replies, refusal, timeout |
 | T-015 | `OidcAuthorizationFailureTest`: 401 with/without challenge and 403 never replay operations |
-| T-016 | `OidcRedirectTest`: same origin, host-only and port-only changes; scheme-only boundary remains pending |
+| T-016 | `OidcRedirectTest`: same origin, host-only and port-only changes; core `RedirectOriginTest`: origin rules |
 | T-017 | `OidcRedirectTest`: all modes and sync/async redirects, including both HTTP/HTTPS directions |
 | T-018 | `OidcLoggingTest`, `OidcPerClientLoggingTest`: logged traffic and diagnostic/cause-chain masking |
 | T-019 | `OidcWsdlTest`: omitted/false secure WSDL gate, including anonymous creation |
@@ -56,6 +56,9 @@ The generated interface is also configured explicitly so no runtime WSDL is need
 | T-026 | Matching `*IT` subclasses inherit application cases and add the T-026 tag |
 
 The module already appears in the reactor and native CI matrix.
+Core runtime `RedirectOriginTest` covers scheme-only changes at the same port,
+implicit/default-port equivalence, and case-insensitive scheme/host comparison.
+`OidcRedirectTest.acquireRedirectChain` verifies header handling over successive redirects.
 `OidcInvalidModeTest` uses a separate `QuarkusExtensionTest` archive because invalid configuration cannot start
 an HTTP-driven application.
 It has no native counterpart.
@@ -66,13 +69,11 @@ The following expectations intentionally remain disabled and explain their depen
 - Q-4: whether explicit URLConnection selection is rejected, and at which phase, or replaced with Vert.x.
 - Q-5: varying only an additional exchange parameter while keeping the subject token and selected client fixed.
   The enabled audience test changes the configured OIDC client too, so it does not claim that independent dimension.
-- T-016: testing a scheme-only origin change at an identical port through the implementation's actual origin decision.
-  The HTTP/HTTPS integration fixtures use separate listening ports.
 - Q-8: whether an optional unauthorized-refresh policy exists and how to configure it.
 - T-025: the documentation build and human review of exchange-cache/revocation semantics after implementation.
 
 `OidcPendingContractTest` keeps these outstanding items visible rather than treating them as passing coverage.
 The enabled lifecycle tests use the Quarkus 4.0.0.Beta2 settings `token-cache-max-size`,
 `early-tokens-acquisition`, `refresh-token-time-skew`, `connection-timeout`, and `connection-retry-count`.
-They do not prescribe refresh behavior for exchange, exact concurrent grant counts, default-port normalization,
+They do not prescribe refresh behavior for exchange, exact concurrent grant counts,
 redirect chains that return to the original origin, or the timing of a failed unauthenticated WSDL GET.

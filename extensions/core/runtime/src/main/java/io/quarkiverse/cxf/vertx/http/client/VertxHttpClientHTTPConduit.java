@@ -43,8 +43,8 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.apache.cxf.Bus;
@@ -465,7 +465,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
          * Read from the producer thread, written from the event loop. Protected by {@link #lock} {@link #requestReady}
          * {@link Condition}
          */
-        private Result<HttpClientRequest> request;
+        private Result<RequestData> request;
 
         /* Retransmit settings, read/written from the event loop */
         private final boolean possibleRetransmit;
@@ -563,13 +563,19 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                             }
 
                             RequestBodyHandler.setProtocolHeaders(outMessage, requestOptions, userAgent, version);
+
+                            final BiFunction<URI, RequestOptions, RequestOptions> authorizationContext;
                             if (authHeader != null) {
                                 requestOptions.putHeader(AUTHORIZATION, authHeader);
+                                authorizationContext = new AuthorizationContext(url);
+                            } else {
+                                authorizationContext = AuthorizationContext.EMPTY;
                             }
 
-                            return client.request(requestOptions);
+                            return client.request(requestOptions).map(req -> new RequestData(req, authorizationContext));
                         })
-                        .onSuccess(req -> {
+                        .onSuccess(requestData -> {
+                            final HttpClientRequest req = requestData.request;
                             mode.timeoutSpec.connected();
                             if (!finalChunk) {
                                 req
@@ -584,13 +590,13 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
 
                                 lock.lock();
                                 try {
-                                    this.request = new Result<>(req, null);
+                                    this.request = new Result<>(requestData, null);
                                     requestReady.signal();
                                 } finally {
                                     lock.unlock();
                                 }
                             } else {
-                                finishRequest(req, buffer);
+                                finishRequest(requestData, buffer);
                             }
                         })
                         .onFailure(t -> {
@@ -621,7 +627,8 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                         bodyWriter = bw;
                     }
                 }
-                final HttpClientRequest req = awaitRequest();
+                final RequestData requestData = awaitRequest();
+                final HttpClientRequest req = requestData.request;
                 if (!finalChunk) {
                     req
                             .write(buffer)
@@ -630,15 +637,16 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                                     "Timeout %d ms sending request body to %s"))
                             .onFailure(RequestBodyHandler.this::failResponse);
                 } else {
-                    finishRequest(req, buffer);
+                    finishRequest(requestData, buffer);
                     mode.awaitResponse();
                 }
             }
         }
 
         @SuppressWarnings("resource")
-        void finishRequest(HttpClientRequest req, Buffer buffer) {
-            prepareResponse(req);
+        void finishRequest(RequestData requestData, Buffer buffer) {
+            final HttpClientRequest req = requestData.request;
+            prepareResponse(requestData);
             req
                     .end(buffer)
                     .timeout(mode.timeoutSpec.remainingReceiveTimeout(), TimeUnit.MILLISECONDS)
@@ -648,7 +656,8 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
 
         }
 
-        private void prepareResponse(HttpClientRequest req) {
+        private void prepareResponse(RequestData requestData) {
+            final HttpClientRequest req = requestData.request;
             req.response()
                     .timeout(mode.timeoutSpec.remainingReceiveTimeout(), TimeUnit.MILLISECONDS)
                     .recover(e -> mode.timeoutSpec.resetRequestAndMapTimeoutException(
@@ -671,9 +680,9 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
 
                                 try {
                                     if (isAuthRetransmit) {
-                                        authorize(clientInfo.getConfigKey(), response);
+                                        authorize(clientInfo.getConfigKey(), response, requestData.authorizationContext);
                                     } else if (isRedirect) {
-                                        redirect(response);
+                                        redirect(response, requestData.authorizationContext);
                                     } else {
                                         throw new IllegalStateException("Either authorize or retransmit should be true");
                                     }
@@ -738,7 +747,8 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                     });
         }
 
-        private void redirect(final HttpClientResponse response) throws IOException {
+        private void redirect(final HttpClientResponse response,
+                BiFunction<URI, RequestOptions, RequestOptions> authorizationContext) throws IOException {
             final URI newUri;
             final String loc = response.getHeader("Location");
 
@@ -758,7 +768,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                 detectRedirectLoop(configKey, redirects, newUri, outMessage);
                 redirects.add(newUri);
                 checkAllowedRedirectUri(configKey, previousUri, newUri, outMessage);
-                retransmit(newUri, Function.identity());
+                retransmit(newUri, authorizationContext);
             } catch (URISyntaxException e) {
                 throw new IOException(
                         "Could not resolve redirect Location " + loc + " relative to " + url, e);
@@ -770,7 +780,8 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
             return retransmits.size() - 1;
         }
 
-        void retransmit(URI newURL, Function<RequestOptions, RequestOptions> requestOptionsCustomizer) throws IOException {
+        void retransmit(URI newURL, BiFunction<URI, RequestOptions, RequestOptions> requestOptionsCustomizer)
+                throws IOException {
             if (log.isDebugEnabled()) {
                 log.debugf("Redirect retransmit: %s",
                         redirects.stream().map(URI::toString).collect(Collectors.joining(" -> ")));
@@ -820,9 +831,10 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                 // Should not be necessary, because we copy from the original requestOptions
                 // setProtocolHeaders(outMessage, options, userAgent);
 
-                return client.request(requestOptionsCustomizer.apply(options))
+                final RequestOptions retransmitOptions = requestOptionsCustomizer.apply(newURL, options);
+                return client.request(retransmitOptions)
                         .compose(req -> {
-                            prepareResponse(req);
+                            prepareResponse(new RequestData(req, requestOptionsCustomizer));
                             return storedBody.pipeTo(req).compose(v -> Future.succeededFuture(req));
                         });
             })
@@ -911,7 +923,8 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
 
         private void authorize(
                 String configKey,
-                HttpClientResponse response) throws IOException {
+                HttpClientResponse response, BiFunction<URI, RequestOptions, RequestOptions> authorizationContext)
+                throws IOException {
             final URI currentURI = url;
             final String authHeaderVal = response.getHeader("WWW-Authenticate");
             if (authHeaderVal == null) {
@@ -935,7 +948,8 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                         + " and WWW-Authenticate: " + authHeader.getFullHeader();
                 throw new IOException(logMessage);
             }
-            retransmit(currentURI, requestOptions -> requestOptions.addHeader("Authorization", authorizationToken));
+            retransmit(currentURI, authorizationContext
+                    .andThen(requestOptions -> requestOptions.addHeader("Authorization", authorizationToken)));
         }
 
         /**
@@ -1060,7 +1074,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
             return true;
         }
 
-        HttpClientRequest awaitRequest() throws IOException {
+        RequestData awaitRequest() throws IOException {
             /* This should be called from the same worker thread as handle() */
             if (request == null) {
                 lock.lock();
@@ -1089,8 +1103,9 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
             }
         }
 
-        void awaitWriteable(HttpClientRequest request) throws IOException, InterruptedException {
+        void awaitWriteable(RequestData requestData) throws IOException, InterruptedException {
             // assert lock.isHeldByCurrentThread();
+            final HttpClientRequest request = requestData.request;
             while (request.writeQueueFull()) {
                 if (this.request.cause() != null) {
                     throw new IOException(this.request.cause());
@@ -1290,6 +1305,32 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
             }
         }
 
+    }
+
+    record RequestData(HttpClientRequest request, BiFunction<URI, RequestOptions, RequestOptions> authorizationContext) {
+    }
+
+    record AuthorizationContext(URI authorizationOrigin) implements BiFunction<URI, RequestOptions, RequestOptions> {
+        static final BiFunction<URI, RequestOptions, RequestOptions> EMPTY = (newUri, opts) -> opts;
+
+        @Override
+        public RequestOptions apply(URI newURL, RequestOptions requestOptions) {
+            if (authorizationOrigin != null && !isSameOrigin(authorizationOrigin, newURL)) {
+                requestOptions.removeHeader(AUTHORIZATION);
+            }
+            return requestOptions;
+        }
+
+        /** Compare HTTP(S) origins, treating an omitted port as the scheme's default port. */
+        static boolean isSameOrigin(URI origin, URI target) {
+            return origin.getScheme().equalsIgnoreCase(target.getScheme())
+                    && origin.getHost().equalsIgnoreCase(target.getHost())
+                    && effectivePort(origin) == effectivePort(target);
+        }
+
+        private static int effectivePort(URI uri) {
+            return uri.getPort() >= 0 ? uri.getPort() : "https".equalsIgnoreCase(uri.getScheme()) ? 443 : 80;
+        }
     }
 
     static class TimeoutSpec {

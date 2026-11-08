@@ -23,13 +23,6 @@ public class OidcPendingContractTest {
     }
 
     @Test
-    @Tag("T-016")
-    @Disabled("The implementation does not yet expose its origin decision for a scheme-only comparison at an identical port")
-    void schemeOnlyOriginChange() {
-        fail("Exercise the implementation's actual origin decision; do not duplicate that decision in a test helper");
-    }
-
-    @Test
     @Tag("T-024")
     @Disabled("Q-8: no refresh-on-unauthorized option or supported modes have been specified; T-015 covers mandatory no-replay")
     void refreshOnUnauthorizedOnlyAffectsALaterInvocation() {
