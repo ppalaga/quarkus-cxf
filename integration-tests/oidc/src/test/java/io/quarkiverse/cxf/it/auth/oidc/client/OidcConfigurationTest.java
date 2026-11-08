@@ -36,6 +36,25 @@ public class OidcConfigurationTest extends OidcTestSupport {
     }
 
     @Tag("T-007")
+    @ParameterizedTest(name = "T-007: unknown OIDC client must not fall back to the default, {0}")
+    @ValueSource(strings = { "sync", "async" })
+    void unknownClient(String style) {
+        // Initialize through a named client first; cold default-client initialization has separate acquisition coverage.
+        String namedOperation = id("T-007-named");
+        success(invoke("acquireNamed", style, null, namedOperation), namedOperation);
+        String defaultOperation = id("T-007-default");
+        success(invoke("acquireDefault", style, null, defaultOperation), defaultOperation);
+        assertThat(grantFor(sentToken(defaultOperation)).getString("client")).isEqualTo("default");
+
+        int grantsBefore = grants().size();
+        String operation = id("T-007-unknown");
+        JsonObject result = invoke("unknownAcquire", style, null, operation);
+        failureBeforeSoap(result, operation);
+        assertThat(result.getString("detail")).contains("No OIDC client named 'missing-client' is configured");
+        assertThat(grants()).hasSize(grantsBefore);
+    }
+
+    @Tag("T-007")
     @Disabled("Q-1: confirm the incompatible grant pairs before fixing these creation-time expectations")
     @ParameterizedTest(name = "T-007: incompatible grant for {0}")
     @ValueSource(strings = { "incompatibleAcquire", "incompatibleExchange" })
