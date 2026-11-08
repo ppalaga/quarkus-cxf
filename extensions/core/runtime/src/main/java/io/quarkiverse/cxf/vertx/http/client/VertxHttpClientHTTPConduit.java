@@ -19,6 +19,7 @@
 
 package io.quarkiverse.cxf.vertx.http.client;
 
+import static io.vertx.core.http.HttpHeaders.AUTHORIZATION;
 import static io.vertx.core.http.HttpHeaders.CONTENT_LENGTH;
 
 import java.io.IOException;
@@ -551,14 +552,23 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                     redirs.add(url);
                 }
 
-                final HttpClient client = clientPool.getClient(clientInfo, version, tlsConfiguration, proxyConfiguration);
-                if (event.eventType() == RequestBodyEventType.COMPLETE_BODY && requestHasBody(requestOptions.getMethod())) {
-                    requestOptions.putHeader(CONTENT_LENGTH, String.valueOf(buffer.length()));
-                }
+                AuthorizationProvider authorizationProvider = AuthorizationProviderLookup.get();
+                authorizationProvider.getAuthorization(clientInfo.getConfigKey())
+                        .compose(authHeader -> {
+                            final HttpClient client = clientPool.getClient(clientInfo, version, tlsConfiguration,
+                                    proxyConfiguration);
+                            if (event.eventType() == RequestBodyEventType.COMPLETE_BODY
+                                    && requestHasBody(requestOptions.getMethod())) {
+                                requestOptions.putHeader(CONTENT_LENGTH, String.valueOf(buffer.length()));
+                            }
 
-                setProtocolHeaders(outMessage, requestOptions, userAgent, version);
+                            RequestBodyHandler.setProtocolHeaders(outMessage, requestOptions, userAgent, version);
+                            if (authHeader != null) {
+                                requestOptions.putHeader(AUTHORIZATION, authHeader);
+                            }
 
-                client.request(requestOptions)
+                            return client.request(requestOptions);
+                        })
                         .onSuccess(req -> {
                             mode.timeoutSpec.connected();
                             if (!finalChunk) {
@@ -975,8 +985,8 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
         void failResponse(Throwable t) {
         }
 
-        static void setProtocolHeaders(Message outMessage, RequestOptions requestOptions, String userAgent, HttpVersion version)
-                throws IOException {
+        static void setProtocolHeaders(Message outMessage, RequestOptions requestOptions, String userAgent,
+                HttpVersion version) {
             final Headers h = new Headers(outMessage);
             final MultiMap outHeaders;
             final String contentType;
