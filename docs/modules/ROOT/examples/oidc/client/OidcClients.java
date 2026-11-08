@@ -27,6 +27,9 @@ public class OidcClients {
     @CXFClient("acquireNamed")
     Instance<OidcEcho> acquireNamed;
 
+    @CXFClient("unknownAcquire")
+    Instance<OidcEcho> unknownAcquire;
+
     @CXFClient("propagate")
     Instance<OidcEcho> propagate;
 
@@ -189,6 +192,7 @@ public class OidcClients {
             case "wsdlDefaultSecure" -> wsdlDefaultSecure;
             case "acquireDefault" -> acquireDefault;
             case "acquireNamed" -> acquireNamed;
+            case "unknownAcquire" -> unknownAcquire;
             case "propagate" -> propagate;
             case "exchangeNamed" -> exchangeNamed;
             case "exchangeOther" -> exchangeOther;

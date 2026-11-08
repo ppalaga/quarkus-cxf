@@ -42,7 +42,7 @@ public class OidcAuthorizationProvider implements AuthorizationProvider {
             final CxfOidcConfig.Oidc oidcConfig = cxfOidcClientConfig.oidc();
             return switch (oidcConfig.mode()) {
                 case DISABLED -> Future.succeededFuture(); // nothing to do
-                case ACQUIRE -> acquire(oidcConfig);
+                case ACQUIRE -> acquire(cxfClientKey, oidcConfig);
                 case PROPAGATE -> propagate(oidcConfig);
                 case EXCHANGE -> exchange(oidcConfig);
                 default -> throw new IllegalStateException(
@@ -53,10 +53,16 @@ public class OidcAuthorizationProvider implements AuthorizationProvider {
         return Future.succeededFuture();
     }
 
-    private Future<String> acquire(CxfOidcConfig.Oidc oidcConfig) {
+    private Future<String> acquire(String cxfClientKey, CxfOidcConfig.Oidc oidcConfig) {
         Optional<String> oidcClientName = oidcConfig.clientName();
-        final OidcClient oidcClient = oidcClientName.map(name -> getOidcClients().getClient(name))
-                .orElseGet(oidcClients::getClient);
+        final Optional<OidcClient> namedOidcClient = oidcClientName.map(name -> getOidcClients().getClient(name));
+        if (oidcClientName.isPresent() && namedOidcClient.isEmpty()) {
+            return Future.failedFuture(new IllegalStateException(
+                    "quarkus.cxf.\"" + cxfClientKey + "\".oidc.client-name references an unknown OIDC client: "
+                            + oidcClientName.get() + ". Select any of " + oidcClientsConfig.namedClients().keySet()
+                            + " or unset it to select the default OIDC client"));
+        }
+        final OidcClient oidcClient = namedOidcClient.orElseGet(getOidcClients()::getClient);
         Uni<Tokens> tokens = getTokenHelper(oidcClientName.orElse(OidcClientsConfig.DEFAULT_CLIENT_KEY)).getTokens(oidcClient);
         return UniHelper.toFuture(tokens)
                 .map(result -> BEARER_SCHEME_WITH_SPACE + result.getAccessToken());
