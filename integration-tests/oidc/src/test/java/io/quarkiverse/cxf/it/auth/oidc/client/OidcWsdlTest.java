@@ -20,8 +20,15 @@ import io.vertx.core.json.JsonObject;
 @QuarkusTestResource(value = OidcTestResource.class, restrictToAnnotatedClass = true, initArgs = @ResourceArg(name = "suite", value = "wsdl"))
 public class OidcWsdlTest extends OidcTestSupport {
     static Stream<Arguments> publicWsdls() {
-        return Stream.of("Acquire", "Propagate", "Exchange")
+        return Stream.of("Propagate", "Exchange")
                 .flatMap(mode -> Stream.of("Omitted", "False").map(gate -> Arguments.of(mode, gate)));
+    }
+
+    @Tag("T-019")
+    @ParameterizedTest(name = "T-019: Acquire WSDL with secure-wsdl-access={0}")
+    @CsvSource({ "Omitted", "False" })
+    void publicAcquireWsdl(String gate) {
+        publicWsdl("Acquire", gate);
     }
 
     @Tag("T-019")
@@ -29,10 +36,12 @@ public class OidcWsdlTest extends OidcTestSupport {
     @MethodSource("publicWsdls")
     void publicWsdl(String mode, String gate) {
         String client = "wsdl" + mode + gate;
-        control("document", new JsonObject().put("client", client));
+        control("document", new JsonObject().put("client", client).put("import", "same"));
         int before = state().getJsonArray("documents").size();
+        int grantsBefore = grants().size();
         JsonObject creation = fresh(client, null, id("T-019-anonymous-create"), true);
         assertThat(creation.getBoolean("success")).as(creation.getString("detail")).isTrue();
+        assertThat(grants()).as("Public document loading must not acquire tokens").hasSize(grantsBefore);
         List<JsonObject> creationGets = documentsSince(this, before);
         assertThat(creationGets).isNotEmpty()
                 .allSatisfy(request -> assertThat(request.getJsonArray("authorization").isEmpty()).isTrue());
@@ -52,8 +61,14 @@ public class OidcWsdlTest extends OidcTestSupport {
 
     @Tag("T-020")
     @ParameterizedTest(name = "T-020: protected WSDL for {0}")
-    @CsvSource({ "wsdlAcquireSecure, named", "wsdlPropagateSecure, propagate", "wsdlExchangeSecure, exchange",
-            "wsdlDefaultSecure, default" })
+    @CsvSource({ "wsdlAcquireSecure, named", "wsdlDefaultSecure, default" })
+    void protectedAcquireWsdl(String client, String selected) {
+        verifyProtectedWsdl(this, client, selected, false);
+    }
+
+    @Tag("T-020")
+    @ParameterizedTest(name = "T-020: protected WSDL for {0}")
+    @CsvSource({ "wsdlPropagateSecure, propagate", "wsdlExchangeSecure, exchange" })
     void protectedWsdl(String client, String selected) {
         verifyProtectedWsdl(this, client, selected, "wsdlExchangeSecure".equals(client));
     }

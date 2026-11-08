@@ -1,6 +1,7 @@
 package io.quarkiverse.cxf;
 
 import java.io.IOException;
+import java.net.URI;
 
 import org.apache.cxf.Bus;
 import org.apache.cxf.configuration.jsse.TLSClientParameters;
@@ -43,8 +44,10 @@ public enum HTTPConduitImpl implements HTTPConduitSpec {
         public HTTPConduit createConduit(CXFClientInfo cxfClientInfo, HttpClientPool httpClientPool, Bus b,
                 EndpointInfo localInfo,
                 EndpointReferenceType target,
-                ProxyConfiguration proxyConfiguration) throws IOException {
-            return new VertxHttpClientHTTPConduit(cxfClientInfo, b, localInfo, target, httpClientPool, proxyConfiguration);
+                ProxyConfiguration proxyConfiguration,
+                URI wsdlRootUri) throws IOException {
+            return new VertxHttpClientHTTPConduit(cxfClientInfo, b, localInfo, target, httpClientPool, proxyConfiguration,
+                    wsdlRootUri);
         }
 
         @Override
@@ -68,7 +71,7 @@ public enum HTTPConduitImpl implements HTTPConduitSpec {
         public HTTPConduit createConduit(CXFClientInfo cxfClientInfo, HttpClientPool httpClientPool, Bus b,
                 EndpointInfo localInfo,
                 EndpointReferenceType target,
-                ProxyConfiguration proxyConfiguration) throws IOException {
+                ProxyConfiguration proxyConfiguration, URI wsdlRootUri) throws IOException {
             return new URLConnectionHTTPConduit(b, localInfo, target);
         }
     };
@@ -86,7 +89,8 @@ public enum HTTPConduitImpl implements HTTPConduitSpec {
     @Override
     public HTTPConduit createConduit(CXFClientInfo cxfClientInfo, HttpClientPool httpClientPool, Bus b, EndpointInfo localInfo,
             EndpointReferenceType target,
-            ProxyConfiguration proxyConfiguration)
+            ProxyConfiguration proxyConfiguration,
+            URI wsdlRootUri)
             throws IOException {
         throw new IllegalStateException(
                 "Call " + HTTPConduitImpl.class.getName() + ".resolveDefault() before calling createConduit()");

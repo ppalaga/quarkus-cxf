@@ -23,7 +23,7 @@ Each test class has an isolated resource configuration.
 The default client uses client credentials except in the dedicated default-exchange classes.
 All supported SOAP clients explicitly select the Vert.x conduit,
 while application.properties sets URLConnection globally.
-Remote WSDL tests create fresh injected proxies and evict the root definition from CXF's WSDL cache before creation.
+Remote WSDL tests create fresh injected proxies with a fresh WSDL manager so every document is fetched again.
 The generated interface is also configured explicitly so no runtime WSDL is needed for ordinary operation tests.
 
 | Scenario | Coverage |
@@ -49,7 +49,7 @@ The generated interface is also configured explicitly so no runtime WSDL is need
 | T-019 | `OidcWsdlTest`: omitted/false secure WSDL gate, including anonymous creation |
 | T-020 | `OidcWsdlTest`, `OidcDefaultExchangeWsdlTest`: protected WSDL and subsequent SOAP authentication |
 | T-021 | `OidcWsdlTest`: missing credentials fail during fresh WSDL creation, before an operation |
-| T-022 | `OidcWsdlOriginTest`: cross-origin WSDL redirects and WSDL/XSD imports |
+| T-022 | `OidcWsdlOriginTest`: WSDL redirects, nested WSDL/XSD imports, and imports after cross-origin redirects |
 | T-023 | `OidcIsolationTest`: event-loop entry, worker dispatch, held grants, identity isolation, failures |
 | T-024 | Pending Q-8; mandatory no-replay assertions are enabled in T-015 |
 | T-025 | Antora source copying is configured; documentation build and prose review remain pending |

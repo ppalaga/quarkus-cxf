@@ -1,6 +1,7 @@
 package io.quarkiverse.cxf;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.Optional;
 
 import javax.net.ssl.HostnameVerifier;
@@ -29,7 +30,7 @@ public interface HTTPConduitSpec {
     }
 
     HTTPConduit createConduit(CXFClientInfo cxfClientInfo, HttpClientPool httpClientPool, Bus b, EndpointInfo localInfo,
-            EndpointReferenceType target, ProxyConfiguration proxyConfiguration)
+            EndpointReferenceType target, ProxyConfiguration proxyConfiguration, URI wsdlRootUri)
             throws IOException;
 
     default Optional<TLSClientParameters> tlsClientParameters(CXFClientInfo cxfClientInfo, Vertx vertx) {

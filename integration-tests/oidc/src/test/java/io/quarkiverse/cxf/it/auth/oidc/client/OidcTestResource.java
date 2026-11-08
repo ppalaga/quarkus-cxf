@@ -333,12 +333,25 @@ public class OidcTestResource implements QuarkusTestResourceLifecycleManager {
         String content;
         if ("import.wsdl".equals(file)) {
             content = """
-                    <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" targetNamespace="urn:oidc:imported"/>
+                    <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" targetNamespace="urn:oidc:imported">
+                      <wsdl:import namespace="urn:oidc:nested" location="nested.wsdl"/>
+                    </wsdl:definitions>
+                    """;
+        } else if ("nested.wsdl".equals(file)) {
+            content = """
+                    <wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" targetNamespace="urn:oidc:nested"/>
                     """;
         } else if ("import.xsd".equals(file)) {
             content = """
                     <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:oidc:imported">
+                      <xs:import namespace="urn:oidc:nested" schemaLocation="nested.xsd"/>
                       <xs:element name="imported" type="xs:string"/>
+                    </xs:schema>
+                    """;
+        } else if ("nested.xsd".equals(file)) {
+            content = """
+                    <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:oidc:nested">
+                      <xs:element name="nested" type="xs:string"/>
                     </xs:schema>
                     """;
         } else {

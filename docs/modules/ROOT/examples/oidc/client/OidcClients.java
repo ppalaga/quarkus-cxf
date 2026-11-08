@@ -7,12 +7,14 @@ import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 
+import org.apache.cxf.Bus;
 import org.apache.cxf.BusFactory;
 import org.apache.cxf.wsdl.WSDLManager;
 import org.eclipse.microprofile.config.ConfigProvider;
 
 import io.quarkiverse.cxf.annotation.CXFClient;
 import io.quarkiverse.cxf.it.auth.oidc.client.model.OidcEcho;
+import io.quarkiverse.cxf.wsdl.QuarkusWSDLManager;
 
 /** Injected client suppliers keep WSDL loading and configuration validation inside the tested request context. */
 @ApplicationScoped
@@ -172,9 +174,12 @@ public class OidcClients {
     }
 
     public synchronized OidcEcho fresh(String name) {
-        // T-019--T-022 must actually fetch the WSDL, including after a valid caller warmed another proxy.
+        // T-019--T-022 must fetch every document again, including after redirects warmed the WSDL cache.
         ConfigProvider.getConfig().getOptionalValue("quarkus.cxf.client." + name + ".wsdl", String.class)
-                .ifPresent(wsdl -> BusFactory.getDefaultBus().getExtension(WSDLManager.class).removeDefinition(wsdl));
+                .ifPresent(wsdl -> {
+                    Bus bus = BusFactory.getDefaultBus();
+                    bus.setExtension(QuarkusWSDLManager.newInstance(bus), WSDLManager.class);
+                });
         return supplier(name).get();
     }
 

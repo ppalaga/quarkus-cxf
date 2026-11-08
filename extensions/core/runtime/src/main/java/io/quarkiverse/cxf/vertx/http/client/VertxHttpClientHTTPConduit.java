@@ -82,6 +82,7 @@ import io.quarkiverse.cxf.QuarkusTLSClientParameters;
 import io.quarkiverse.cxf.vertx.http.client.BodyRecorder.BodyWriter;
 import io.quarkiverse.cxf.vertx.http.client.BodyRecorder.StoredBody;
 import io.quarkiverse.cxf.vertx.http.client.VertxHttpClientHTTPConduit.RequestBodyEvent.RequestBodyEventType;
+import io.quarkiverse.cxf.wsdl.QuarkusWSDLManager;
 import io.quarkus.arc.Arc;
 import io.quarkus.arc.InstanceHandle;
 import io.quarkus.proxy.ProxyConfiguration;
@@ -119,6 +120,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
     private final String userAgent;
     private final CXFClientInfo clientInfo;
     private final ProxyConfiguration proxyConfiguration;
+    private final URI wsdlRootUri;
 
     public VertxHttpClientHTTPConduit(
             CXFClientInfo clientInfo,
@@ -126,13 +128,30 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
             EndpointInfo ei,
             EndpointReferenceType t,
             HttpClientPool httpClientPool,
-            ProxyConfiguration proxyConfiguration)
+            ProxyConfiguration proxyConfiguration,
+            URI wsdlRootUri)
             throws IOException {
         super(b, ei, t);
         this.clientInfo = clientInfo;
         this.httpClientPool = httpClientPool;
         this.proxyConfiguration = proxyConfiguration;
+        this.wsdlRootUri = wsdlRootUri;
         this.userAgent = Version.getCompleteVersionString();
+    }
+
+    /** Return the permitted origin, or {@code null} to skip the authorization provider for this request. */
+    static URI authorizationOrigin(URI requestUri, URI wsdlRootUri, EndpointInfo endpointInfo, boolean isSecureWsdlAccess) {
+        if (!QuarkusWSDLManager.isWsdlEndpoint(endpointInfo)) {
+            return requestUri;
+        }
+        if (!isSecureWsdlAccess) {
+            return null;
+        }
+        if (wsdlRootUri != null && wsdlRootUri.getScheme() != null && wsdlRootUri.getHost() != null
+                && AuthorizationContext.isSameOrigin(wsdlRootUri, requestUri)) {
+            return wsdlRootUri;
+        }
+        return null;
     }
 
     @Override
@@ -253,6 +272,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                 requestContext.clientInfo,
                 message,
                 requestContext.uri,
+                authorizationOrigin(requestContext.uri, wsdlRootUri, endpointInfo, clientInfo.isSecureWsdlAccess()),
                 cookies,
                 userAgent,
                 httpClientPool,
@@ -445,6 +465,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
     static class RequestBodyHandler implements IOEHandler<RequestBodyEvent> {
         private final Message outMessage;
         private final URI url;
+        private final URI authorizationOrigin;
         private final Cookies cookies;
         private final String userAgent;
         private final HttpClientPool clientPool;
@@ -489,6 +510,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                 CXFClientInfo clientInfo,
                 Message outMessage,
                 URI url,
+                URI authorizationOrigin,
                 Cookies cookies,
                 String userAgent,
                 HttpClientPool clientPool,
@@ -508,6 +530,7 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
             this.clientInfo = clientInfo;
             this.outMessage = outMessage;
             this.url = url;
+            this.authorizationOrigin = authorizationOrigin;
             this.cookies = cookies;
             this.userAgent = userAgent;
             this.clientPool = clientPool;
@@ -552,8 +575,10 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                     redirs.add(url);
                 }
 
-                AuthorizationProvider authorizationProvider = AuthorizationProviderLookup.get();
-                authorizationProvider.getAuthorization(clientInfo.getConfigKey())
+                final Future<String> authorization = authorizationOrigin == null
+                        ? Future.succeededFuture()
+                        : AuthorizationProviderLookup.get().getAuthorization(clientInfo.getConfigKey());
+                authorization
                         .compose(authHeader -> {
                             final HttpClient client = clientPool.getClient(clientInfo, version, tlsConfiguration,
                                     proxyConfiguration);
@@ -567,7 +592,9 @@ public class VertxHttpClientHTTPConduit extends HTTPConduit {
                             final BiFunction<URI, RequestOptions, RequestOptions> authorizationContext;
                             if (authHeader != null) {
                                 requestOptions.putHeader(AUTHORIZATION, authHeader);
-                                authorizationContext = new AuthorizationContext(url);
+                                authorizationContext = authorizationOrigin != null
+                                        ? new AuthorizationContext(authorizationOrigin)
+                                        : AuthorizationContext.EMPTY;
                             } else {
                                 authorizationContext = AuthorizationContext.EMPTY;
                             }

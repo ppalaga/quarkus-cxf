@@ -1,6 +1,7 @@
 package io.quarkiverse.cxf;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -42,19 +43,22 @@ public class QuarkusHTTPConduitFactory implements HTTPConduitFactory {
     private final AuthorizationPolicy authorizationPolicy;
     private final Vertx vertx;
     private final HttpClientPool httpClientPool;
+    private final URI wsdlRootUri;
 
     public QuarkusHTTPConduitFactory(
             CxfFixedConfig cxFixedConfig,
             CXFClientInfo cxfClientInfo,
             AuthorizationPolicy authorizationPolicy,
             Vertx vertx,
-            HttpClientPool httpClientPool) {
+            HttpClientPool httpClientPool,
+            URI wsdlRootUri) {
         super();
         this.cxFixedConfig = cxFixedConfig;
         this.cxfClientInfo = cxfClientInfo;
         this.authorizationPolicy = authorizationPolicy;
         this.vertx = vertx;
         this.httpClientPool = httpClientPool;
+        this.wsdlRootUri = wsdlRootUri;
     }
 
     @Override
@@ -81,7 +85,8 @@ public class QuarkusHTTPConduitFactory implements HTTPConduitFactory {
                 b,
                 localInfo,
                 target,
-                pConfig);
+                pConfig,
+                wsdlRootUri);
         if (httpConduit instanceof HttpClientHTTPConduit) {
             Log.warnf("Usage of %s is deprecated since Quarkus CXF 3.18.0."
                     + " You may want to review the options quarkus.cxf.http-conduit-factory and/or quarkus.cxf.client.\"%s\".http-conduit-factory",

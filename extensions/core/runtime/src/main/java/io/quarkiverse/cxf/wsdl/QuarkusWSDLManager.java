@@ -49,6 +49,8 @@ import org.xml.sax.InputSource;
  */
 public class QuarkusWSDLManager extends WSDLManagerImpl {
 
+    static final QName TRANSPORT_URI_RESOLVER = new QName("http://cxf.apache.org", "TransportURIResolver");
+
     private final ExtensionRegistry registry;
     private XMLStreamReaderWrapper xmlStreamReaderWrapper;
 
@@ -58,6 +60,10 @@ public class QuarkusWSDLManager extends WSDLManagerImpl {
         } catch (BusException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public static boolean isWsdlEndpoint(EndpointInfo endpointInfo) {
+        return TRANSPORT_URI_RESOLVER.equals(endpointInfo.getName());
     }
 
     private QuarkusWSDLManager(Bus b) throws BusException {
@@ -231,7 +237,7 @@ public class QuarkusWSDLManager extends WSDLManagerImpl {
                     if (ci != null) {
                         EndpointInfo info = new EndpointInfo();
                         // set the endpointInfo name which could be used for configuration
-                        info.setName(new QName("http://cxf.apache.org", "TransportURIResolver"));
+                        info.setName(TRANSPORT_URI_RESOLVER);
                         info.setAddress(base.toString());
                         Conduit c = ci.getConduit(info, bus);
                         Message message = new MessageImpl();

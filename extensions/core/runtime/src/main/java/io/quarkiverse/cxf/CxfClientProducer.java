@@ -4,6 +4,7 @@ import static java.util.stream.Collectors.toList;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -199,12 +200,14 @@ public abstract class CxfClientProducer {
         customizers.forEach(customizer -> customizer.customize(cxfClientInfo, factory));
 
         final Bus bus = BusFactory.getDefaultBus();
+        final String wsdlUri = factory.getWsdlURL();
         final QuarkusHTTPConduitFactory conduitFactory = new QuarkusHTTPConduitFactory(
                 fixedConfig,
                 cxfClientInfo,
                 authorizationPolicy,
                 vertx,
-                httpClientPool);
+                httpClientPool,
+                wsdlUri == null ? null : URI.create(wsdlUri));
         props.put(HTTPConduitFactory.class.getName(), conduitFactory);
         Object result;
         final HTTPConduitFactory origConduitFactory = bus.getExtension(HTTPConduitFactory.class);
